@@ -56,6 +56,11 @@ ExitBox automatically:
 - **Named Resumable Sessions** — save and resume agent conversations by name across container restarts
 - **Multi-Agent Support** — run Claude Code, OpenAI Codex, or OpenCode in the same isolated environment
 - **Workspace Isolation** — named contexts (personal, work, client) with separate credentials, tools, and vault per workspace
+- **IDE Integration** — Unix socket relay connects host editors (VS Code, Cursor, Windsurf) to agents inside the container for go-to-definition, diagnostics, and code actions
+- **Full Git Support** — optional mode that mounts host `.gitconfig` and SSH agent for seamless git operations inside the container
+- **GitHub CLI Authentication** — pre-flight vault import for `GITHUB_TOKEN` with automatic in-container export so `gh` and HTTPS git work transparently
+- **RTK Token Optimizer (Experimental)** — optional [rtk](https://github.com/rtk-ai/rtk) integration reduces CLI output token consumption by 60-90%
+- **External Tools** — configure third-party tools (GitHub CLI, etc.) via the setup wizard; packages are auto-installed at image build time
 - **Supply-Chain Hardened Installs** — Claude Code installed via direct binary download with SHA-256 checksum verification
 - **Alpine Base Image** — minimal ~5 MB base with 3-layer image hierarchy and incremental rebuilds
 - **Setup Wizard** — interactive TUI that configures roles, languages, tools, agents, firewall, and vault in one pass
@@ -91,6 +96,93 @@ Instructions are written to each agent's native global instructions file:
 | OpenCode | `~/.config/opencode/AGENTS.md`           |
 
 If the file already exists (e.g., from your own global instructions), ExitBox appends the sandbox notice once. The instructions inform the agent about network restrictions, dropped capabilities, and the read-only nature of the environment so it can focus on writing and debugging code within `/workspace`.
+
+### IDE Integration
+
+ExitBox can relay Unix sockets between the host and container so editors running on the host (VS Code, Cursor, Windsurf, etc.) can communicate with agents inside the sandbox. This enables features like go-to-definition, diagnostics, and code actions to work across the container boundary.
+
+The relay is automatic — when an agent starts, ExitBox detects running IDE instances and establishes a socket tunnel. No manual configuration is needed.
+
+### Full Git Support
+
+By default, containers have no access to host git credentials. Full git support mode mounts the host `.gitconfig` and SSH agent into the container so git operations (clone, push, pull) work transparently with your existing configuration.
+
+```bash
+# Enable per-session:
+exitbox run claude --full-git-support
+
+# Or enable permanently in the setup wizard:
+exitbox setup
+# → Settings → Full Git Support
+```
+
+When full git support is enabled and the network firewall is active, SSH traffic (e.g., `git push` to GitHub) is automatically tunneled through the Squid proxy. This works even without `SSH_AUTH_SOCK` being set on the host.
+
+### External Tools
+
+External tools are third-party CLI tools (GitHub CLI, etc.) that can be selected during setup. Their required packages are automatically installed at image build time.
+
+```bash
+# Configure via the setup wizard:
+exitbox setup
+# → Settings → External Tools → select tools
+```
+
+### GitHub CLI Authentication
+
+When GitHub CLI is selected as an external tool and the vault is enabled for the workspace, ExitBox provides seamless `gh` authentication:
+
+**Pre-flight prompt (host side):** Before launching an agent, ExitBox checks whether `GITHUB_TOKEN` exists in the workspace vault. If missing, it offers to import it:
+
+```
+GitHub CLI is enabled but GITHUB_TOKEN is not in your vault.
+Import it now? [y/N]: y
+Enter vault password: ****
+Paste your GitHub token: ****
+✓ GITHUB_TOKEN stored in vault for workspace 'default'
+```
+
+**Auto-export (container side):** On container startup, the entrypoint fetches `GITHUB_TOKEN` from the vault via IPC (triggering an approval popup on the host), exports it as `GH_TOKEN`, and runs `gh auth setup-git` to configure git credential helpers. This means `gh` commands and HTTPS git operations authenticate transparently.
+
+```bash
+# Inside the container, these just work:
+gh pr list
+gh issue create --title "Bug report"
+git push origin main   # uses gh credential helper for HTTPS
+```
+
+The token is never stored in the container filesystem. Every vault read triggers a host-side approval popup, giving you full control over secret access.
+
+### RTK Token Optimizer (Experimental)
+
+[rtk](https://github.com/rtk-ai/rtk) wraps common CLI commands to produce compact, token-optimized output — reducing agent token consumption by 60-90%. When enabled, rtk is built from source at image build time using a musl-native Rust toolchain. It adds zero image size overhead when disabled.
+
+```bash
+# Enable via the setup wizard:
+exitbox setup
+# → Settings → RTK → Enable
+```
+
+When RTK is enabled, sandbox instructions injected into the agent automatically guide it to prefix supported commands with `rtk`:
+
+```bash
+rtk git status         # compact git output
+rtk go test ./...      # compact test results
+rtk ls /workspace      # compact directory listing
+rtk gh pr list         # compact GitHub CLI output
+rtk grep <pattern>     # compact search results
+```
+
+Supported command categories: `git`, `go`, `gh`, `grep`, `ls`, `curl`, `cargo`, `pytest`, `pnpm`, `docker`, `kubectl`, and more. See the [rtk documentation](https://github.com/rtk-ai/rtk) for the full list.
+
+Agent-level management commands:
+
+```bash
+exitbox agents list            # Show enabled agents and their status
+exitbox agents config claude   # Open agent config in $EDITOR
+```
+
+> **Note:** RTK is experimental. If you encounter issues, disable it via `exitbox setup` and rebuild with `exitbox run <agent> --update`.
 
 ### Named Resumable Sessions
 
@@ -230,6 +322,8 @@ exitbox rebuild all       # Rebuild all enabled agents
 exitbox uninstall <agent> # Remove agent images and config
 exitbox update            # Update ExitBox to the latest version
 exitbox aliases           # Print shell aliases for ~/.bashrc
+exitbox agents list       # List enabled agents and their status
+exitbox agents config <agent>  # Open agent config in $EDITOR
 ```
 
 ### Config Generation
@@ -435,9 +529,12 @@ exitbox run --no-resume claude     # Start a fresh session (don't resume previou
 exitbox run --name "my-session" claude   # No --resume needed; resumes if session exists
 exitbox run --resume "my-session" claude # Resume by named session (or by session id)
 exitbox run -w work claude         # Use a specific workspace for this session
+exitbox run --full-git-support claude    # Mount host .gitconfig and SSH agent
+exitbox run --ollama claude              # Use host Ollama for local models
+exitbox run --memory 16g --cpus 8 claude # Custom resource limits
 ```
 
-All flags have long forms: `-f`/`--no-firewall`, `-r`/`--read-only`, `-v`/`--verbose`, `-n`/`--no-env`, `--resume [SESSION|TOKEN]`, `--no-resume`, `--name`, `-i`/`--include-dir`, `-t`/`--tools`, `-a`/`--allow-urls`, `-u`/`--update`, `-w`/`--workspace`.
+All flags have long forms: `-f`/`--no-firewall`, `-r`/`--read-only`, `-v`/`--verbose`, `-n`/`--no-env`, `--resume [SESSION|TOKEN]`, `--no-resume`, `--name`, `-i`/`--include-dir`, `-t`/`--tools`, `-a`/`--allow-urls`, `-u`/`--update`, `-w`/`--workspace`, `--full-git-support`, `--ollama`, `--memory`, `--cpus`.
 
 ## Available Profiles
 
