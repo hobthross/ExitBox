@@ -23,8 +23,11 @@ Run AI coding assistants (Claude, Codex, OpenCode) in isolated containers with d
 ## Getting Started
 
 ```bash
-# Install (Linux/macOS)
-curl -fsSL https://raw.githubusercontent.com/cloud-exit/exitbox/main/scripts/install.sh | sh
+# Install (Linux/macOS) — download the latest release binary
+# See Installation section below for full instructions
+mkdir -p ~/.local/bin
+curl -fsSL https://github.com/Cloud-Exit/ExitBox/releases/latest/download/exitbox-$(uname -s | tr A-Z a-z)-$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/') -o ~/.local/bin/exitbox
+chmod +x ~/.local/bin/exitbox
 
 # Run the setup wizard (first time)
 exitbox setup
@@ -232,8 +235,11 @@ All agents are installed inside the container. Existing host config (`~/.claude`
 sudo apt update && sudo apt install -y podman   # Ubuntu/Debian
 # OR: install Docker - see https://docs.docker.com/engine/install/
 
-# Install exitbox
-curl -fsSL https://raw.githubusercontent.com/cloud-exit/exitbox/main/scripts/install.sh | sh
+# Download the latest release binary
+mkdir -p ~/.local/bin
+curl -fsSL https://github.com/Cloud-Exit/ExitBox/releases/latest/download/exitbox-linux-amd64 -o ~/.local/bin/exitbox
+chmod +x ~/.local/bin/exitbox
+# For ARM64: replace exitbox-linux-amd64 with exitbox-linux-arm64
 
 # Run the setup wizard
 exitbox setup
@@ -250,8 +256,11 @@ brew install podman
 podman machine init && podman machine start
 # OR: brew install --cask docker
 
-# Install exitbox
-curl -fsSL https://raw.githubusercontent.com/cloud-exit/exitbox/main/scripts/install.sh | sh
+# Download the latest release binary
+mkdir -p ~/.local/bin
+curl -fsSL https://github.com/Cloud-Exit/ExitBox/releases/latest/download/exitbox-darwin-arm64 -o ~/.local/bin/exitbox
+chmod +x ~/.local/bin/exitbox
+# For Intel Macs: replace exitbox-darwin-arm64 with exitbox-darwin-amd64
 
 # Run the setup wizard
 exitbox setup
@@ -282,7 +291,9 @@ wsl --install -d Ubuntu
 Then in WSL2:
 ```bash
 sudo apt update && sudo apt install -y podman
-curl -fsSL https://raw.githubusercontent.com/cloud-exit/exitbox/main/scripts/install.sh | sh
+mkdir -p ~/.local/bin
+curl -fsSL https://github.com/Cloud-Exit/ExitBox/releases/latest/download/exitbox-linux-amd64 -o ~/.local/bin/exitbox
+chmod +x ~/.local/bin/exitbox
 exitbox setup
 ```
 
@@ -293,6 +304,34 @@ git clone https://github.com/Cloud-Exit/exitbox.git
 cd exitbox
 make build       # builds ./exitbox
 make install     # installs to ~/.local/bin/exitbox
+```
+
+### Script Installer (not recommended)
+
+A convenience install script is available but **not advised from a security perspective**. Piping a remote script into your shell executes arbitrary code with your user's full permissions — you cannot review what runs before it runs. If the hosting server, DNS, or CDN is compromised, the script could be replaced with something malicious. You also lose the ability to verify checksums or signatures before execution.
+
+If you still want to use it:
+
+```bash
+# Review the script first
+curl -fsSL https://raw.githubusercontent.com/cloud-exit/exitbox/main/scripts/install.sh -o install.sh
+less install.sh
+sh install.sh
+```
+
+Prefer the manual binary download or building from source described above.
+
+### Updating
+
+```bash
+exitbox update
+```
+
+This downloads the latest release binary and replaces the current installation in-place. To update agent images (Claude Code, Codex, etc.) to their latest versions:
+
+```bash
+exitbox run --update claude    # rebuild with latest agent version
+exitbox rebuild all            # rebuild all enabled agents
 ```
 
 ## Commands
