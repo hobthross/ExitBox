@@ -262,24 +262,22 @@ func AgentContainer(rt container.Runtime, opts Options) (int, error) {
 		args = append(args, "-v", dir+":/workspace/"+base)
 	}
 
-	// Mount config.yaml individually (read-write for in-container workspace switching).
+	// Mount the entire config directory so the entrypoint can read/write
+	// config.yaml (workspace switching) and access workspace profiles.
+	// Ensure the config file exists before mounting (otherwise the runtime
+	// creates a directory named config.yaml instead of a file).
 	configFile := filepath.Join(config.Home, "config.yaml")
 	if _, statErr := os.Stat(configFile); statErr != nil {
 		if saveErr := config.SaveConfig(cfg); saveErr != nil {
 			ui.Warnf("Failed to create config file for mount: %v", saveErr)
 		}
 	}
-	args = append(args, "-v", configFile+":/home/user/.exitbox-config/config.yaml")
+	args = append(args, "-v", config.Home+":/home/user/.exitbox-config")
 
 	if activeWorkspace != nil {
 		if err := profile.EnsureAgentConfig(activeWorkspace.Workspace.Name, opts.Agent); err != nil {
 			ui.Warnf("Failed to prepare workspace config for %s/%s: %v", activeWorkspace.Scope, activeWorkspace.Workspace.Name, err)
 		}
-		// Mount only the active workspace's agent dir for credential isolation.
-		// Other workspaces' credentials are not accessible from within the container.
-		hostDir := profile.WorkspaceAgentDir(activeWorkspace.Workspace.Name, opts.Agent)
-		containerDir := "/home/user/.exitbox-config/profiles/global/" + activeWorkspace.Workspace.Name + "/" + opts.Agent
-		args = append(args, "-v", hostDir+":"+containerDir)
 		args = append(args,
 			"-e", "EXITBOX_WORKSPACE_SCOPE="+activeWorkspace.Scope,
 			"-e", "EXITBOX_WORKSPACE_NAME="+activeWorkspace.Workspace.Name,
