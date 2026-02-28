@@ -139,6 +139,10 @@ func (c *Codex) DetectHostConfig() (string, error) {
 	return "", fmt.Errorf("no Codex config found")
 }
 
+func (c *Codex) ConfigFilePath(wsDir string) string {
+	return filepath.Join(wsDir, ".codex", "config.toml")
+}
+
 func (c *Codex) ImportConfig(src, dst string) error {
 	if strings.Contains(src, filepath.Join(".config", "codex")) {
 		target := filepath.Join(dst, ".config", "codex")
@@ -148,6 +152,18 @@ func (c *Codex) ImportConfig(src, dst string) error {
 	target := filepath.Join(dst, ".codex")
 	_ = os.MkdirAll(target, 0755)
 	return copyDirContents(src, target)
+}
+
+func (c *Codex) ImportFile(src, dst string) error {
+	target := filepath.Join(dst, ".codex", filepath.Base(src))
+	if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+		return err
+	}
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(target, data, 0644)
 }
 
 func copyDirContents(src, dst string) error {

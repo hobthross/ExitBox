@@ -38,6 +38,8 @@ type Agent interface {
 	ContainerMounts(cfgDir string) []Mount
 	DetectHostConfig() (string, error)
 	ImportConfig(src, dst string) error
+	ImportFile(src, dst string) error
+	ConfigFilePath(wsDir string) string
 }
 
 // AgentNames is the list of all supported agent names.

@@ -18,14 +18,21 @@ package ipc
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/cloud-exit/exitbox/internal/container"
 	"github.com/cloud-exit/exitbox/internal/network"
 )
+
+// promptTimeout is the maximum time to wait for the user to respond to
+// a tmux popup prompt. Prevents indefinite deadlocks when the popup
+// cannot render (e.g. Codex controlling the terminal).
+const promptTimeout = 30 * time.Second
 
 // AllowDomainHandlerConfig holds dependencies for the allow_domain handler.
 type AllowDomainHandlerConfig struct {
@@ -108,7 +115,10 @@ func promptViaTmuxPopup(rt container.Runtime, containerName, domain string) (boo
 		safeDomain +
 		`\033[0m\n\n  [y/N]: '; read ans; [ "$ans" = "y" ] || [ "$ans" = "yes" ]`
 
-	c := exec.Command(cmd, "exec", containerName,
+	ctx, cancel := context.WithTimeout(context.Background(), promptTimeout)
+	defer cancel()
+
+	c := exec.CommandContext(ctx, cmd, "exec", containerName,
 		"tmux", "display-popup", "-E", "-w", "50", "-h", "8",
 		"sh", "-c", script,
 	)
@@ -116,6 +126,10 @@ func promptViaTmuxPopup(rt container.Runtime, containerName, domain string) (boo
 	var stderr bytes.Buffer
 	c.Stderr = &stderr
 	err := c.Run()
+
+	if ctx.Err() == context.DeadlineExceeded {
+		return false, fmt.Errorf("prompt timed out after %v (popup may not be visible to user)", promptTimeout)
+	}
 
 	if err == nil {
 		return true, nil // exit 0 = approved

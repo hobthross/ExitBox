@@ -135,6 +135,22 @@ func (o *OpenCode) DetectHostConfig() (string, error) {
 	return "", fmt.Errorf("no OpenCode config found")
 }
 
+func (o *OpenCode) ImportFile(src, dst string) error {
+	target := filepath.Join(dst, ".config", "opencode", filepath.Base(src))
+	if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+		return err
+	}
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(target, data, 0644)
+}
+
+func (o *OpenCode) ConfigFilePath(wsDir string) string {
+	return filepath.Join(wsDir, ".config", "opencode", "opencode.json")
+}
+
 func (o *OpenCode) ImportConfig(src, dst string) error {
 	if strings.Contains(src, filepath.Join(".config", "opencode")) {
 		target := filepath.Join(dst, ".config", "opencode")

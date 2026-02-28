@@ -39,6 +39,122 @@ const (
 	SquidImageRegistry = "ghcr.io/cloud-exit/exitbox-squid"
 )
 
+// exitboxAllowWrapper is a Python script that tries the Go binary first and
+// falls back to native Python IPC. Uses #!/usr/bin/env python3 so the kernel
+// invokes python3 directly — critical for Codex, whose seccomp sandbox blocks
+// Unix socket connect() for all /bin/sh child processes but allows python3.
+const exitboxAllowWrapper = `#!/usr/bin/env python3
+"""exitbox-allow — domain allow request wrapper.
+
+Tries the native Go binary first; falls back to Python IPC if blocked.
+"""
+
+import json
+import os
+import secrets
+import socket
+import subprocess
+import sys
+
+
+def try_go_binary(args):
+    """Try the Go binary. Returns exit code or None if not found."""
+    try:
+        result = subprocess.run(
+            ["exitbox-allow-bin"] + args,
+            capture_output=True, text=True,
+        )
+        if result.returncode == 0:
+            if result.stdout:
+                print(result.stdout, end="")
+            return 0
+        # Check if it failed due to sandbox EPERM vs a real error.
+        stderr = result.stderr.lower()
+        for marker in ("connect failed", "not available", "operation not permitted"):
+            if marker in stderr:
+                return None  # sandbox block — fall through to Python IPC
+        # Real error — relay it.
+        if result.stderr:
+            print(result.stderr, end="", file=sys.stderr)
+        return result.returncode
+    except FileNotFoundError:
+        return None
+
+
+def request_allow(sock_path, domain):
+    """Send an allow_domain IPC request. Returns (approved, error)."""
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        sock.connect(sock_path)
+    except OSError as exc:
+        return False, (
+            f"IPC socket not available ({exc}). "
+            "Domain allow requests require firewall mode"
+        )
+
+    req = json.dumps({
+        "type": "allow_domain",
+        "id": secrets.token_hex(8),
+        "payload": {"domain": domain},
+    }) + "\n"
+    sock.sendall(req.encode())
+
+    buf = b""
+    while b"\n" not in buf:
+        chunk = sock.recv(4096)
+        if not chunk:
+            break
+        buf += chunk
+    sock.close()
+
+    if not buf.strip():
+        return False, "no response from host"
+
+    resp = json.loads(buf)
+    payload = resp.get("payload", {})
+    if isinstance(payload, str):
+        payload = json.loads(payload)
+
+    err = payload.get("error", "")
+    if err:
+        return False, err
+
+    return payload.get("approved", False), None
+
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: exitbox-allow <domain> [domain ...]", file=sys.stderr)
+        sys.exit(1)
+
+    # Fast path: try Go binary.
+    rc = try_go_binary(sys.argv[1:])
+    if rc is not None:
+        sys.exit(rc)
+
+    # Fallback: Python IPC.
+    sock_path = os.environ.get("EXITBOX_IPC_SOCKET", "/run/exitbox/host.sock")
+    failed = False
+
+    for domain in sys.argv[1:]:
+        approved, err = request_allow(sock_path, domain)
+        if err:
+            print(f"Error: {domain}: {err}", file=sys.stderr)
+            failed = True
+            continue
+        if approved:
+            print(f"Approved: {domain}")
+        else:
+            print(f"Denied: {domain}")
+            failed = True
+
+    sys.exit(1 if failed else 0)
+
+
+if __name__ == "__main__":
+    main()
+`
+
 // Version is set from cmd package.
 var Version = "3.2.0"
 
@@ -196,11 +312,26 @@ func writeExitboxAllow(buildCtx string) (string, error) {
 	default:
 		allowBin = static.ExitboxAllowAmd64
 	}
-	if err := os.WriteFile(filepath.Join(buildCtx, "exitbox-allow"), allowBin, 0755); err != nil {
+	if err := os.WriteFile(filepath.Join(buildCtx, "exitbox-allow-bin"), allowBin, 0755); err != nil {
 		ui.Warnf("Failed to write exitbox-allow: %v", err)
 		return "", err
 	}
-	return "\n# IPC client\nCOPY exitbox-allow /usr/local/bin/exitbox-allow\n", nil
+	// Write the shell wrapper that tries the Go binary first and falls back
+	// to a Python IPC client when the binary is blocked (e.g. by Codex's
+	// seccomp sandbox which returns EPERM on Go's connect() syscall).
+	if err := os.WriteFile(filepath.Join(buildCtx, "exitbox-allow"), []byte(exitboxAllowWrapper), 0755); err != nil {
+		ui.Warnf("Failed to write exitbox-allow wrapper: %v", err)
+		return "", err
+	}
+	// Write the standalone Python IPC script. Codex's sandbox blocks all
+	// /bin/sh children from using Unix sockets, so the shell wrapper's
+	// Python fallback also fails. Agents must invoke this script directly
+	// as: python3 /usr/local/bin/exitbox-allow-ipc.py <domain>
+	if err := os.WriteFile(filepath.Join(buildCtx, "exitbox-allow-ipc.py"), static.ExitboxAllowIPC, 0755); err != nil {
+		ui.Warnf("Failed to write exitbox-allow-ipc.py: %v", err)
+		return "", err
+	}
+	return "\n# IPC client (Go binary + shell/Python fallback + standalone Python)\nCOPY exitbox-allow-bin /usr/local/bin/exitbox-allow-bin\nCOPY exitbox-allow /usr/local/bin/exitbox-allow\nCOPY exitbox-allow-ipc.py /usr/local/bin/exitbox-allow-ipc.py\n", nil
 }
 
 // writeExitboxVault writes the exitbox-vault binary into the build context

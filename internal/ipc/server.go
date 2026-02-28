@@ -38,7 +38,8 @@ type Server struct {
 	socketPath string
 	listener   net.Listener
 	handlers   map[string]HandlerFunc
-	mu         sync.Mutex // serializes handler calls (one prompt at a time)
+	mu         sync.Mutex // protects handler map reads
+	promptMu   sync.Mutex // serializes handler calls (one prompt at a time)
 	done       chan struct{}
 	wg         sync.WaitGroup
 }
@@ -146,8 +147,9 @@ func (s *Server) handleConnection(conn net.Conn) {
 
 	s.mu.Lock()
 	handler, ok := s.handlers[req.Type]
+	s.mu.Unlock()
+
 	if !ok {
-		s.mu.Unlock()
 		resp := Response{
 			Type: req.Type,
 			ID:   req.ID,
@@ -165,8 +167,11 @@ func (s *Server) handleConnection(conn net.Conn) {
 	}
 
 	// Serialize handler calls so only one TTY prompt runs at a time.
+	// Use a separate mutex so a slow/hung prompt cannot block handler
+	// map lookups or non-prompt IPC operations (vault, kv).
+	s.promptMu.Lock()
 	payload, err := handler(&req)
-	s.mu.Unlock()
+	s.promptMu.Unlock()
 
 	resp := Response{
 		Type: req.Type,
