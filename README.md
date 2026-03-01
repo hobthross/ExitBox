@@ -581,9 +581,10 @@ exitbox run -w work claude         # Use a specific workspace for this session
 exitbox run --full-git-support claude    # Mount host .gitconfig and SSH agent
 exitbox run --ollama claude              # Use host Ollama for local models
 exitbox run --memory 16g --cpus 8 claude # Custom resource limits
+exitbox run --version 1.0.123 claude   # Pin specific agent version
 ```
 
-All flags have long forms: `-f`/`--no-firewall`, `-r`/`--read-only`, `-v`/`--verbose`, `-n`/`--no-env`, `--resume [SESSION|TOKEN]`, `--no-resume`, `--name`, `-i`/`--include-dir`, `-t`/`--tools`, `-a`/`--allow-urls`, `-u`/`--update`, `-w`/`--workspace`, `--full-git-support`, `--ollama`, `--memory`, `--cpus`.
+All flags have long forms: `-f`/`--no-firewall`, `-r`/`--read-only`, `-v`/`--verbose`, `-n`/`--no-env`, `--resume [SESSION|TOKEN]`, `--no-resume`, `--name`, `-i`/`--include-dir`, `-t`/`--tools`, `-a`/`--allow-urls`, `-u`/`--update`, `-w`/`--workspace`, `--full-git-support`, `--ollama`, `--memory`, `--cpus`, `--version`.
 
 ## Available Profiles
 
@@ -650,6 +651,7 @@ workspaces:
 agents:
   claude:
     enabled: true
+    version: "1.0.123"    # pin agent version (omit for latest)
   codex:
     enabled: false
   opencode:

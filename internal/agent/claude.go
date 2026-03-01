@@ -27,8 +27,8 @@ import (
 )
 
 const (
-	claudeGCSDefault    = "https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases"
-	claudeInstallSHURL  = "https://claude.ai/install.sh"
+	claudeGCSDefault   = "https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases"
+	claudeInstallSHURL = "https://claude.ai/install.sh"
 )
 
 // Claude implements the Agent interface for Claude Code.
@@ -113,7 +113,11 @@ RUN set -e && \
         if ! "$bp" --version >/dev/null 2>&1; then \
             echo "Binary v${ver} failed compatibility check (musl)" >&2; rm -f "$bp"; return 1; \
         fi && \
-        "$bp" install && \
+        # Skip the built-in install command which may trigger auto-update
+        # Instead, manually copy the binary to the target location
+        mkdir -p "$HOME/.local/share/claude/versions/$ver/bin" && \
+        cp "$bp" "$HOME/.local/share/claude/versions/$ver/bin/claude" && \
+        chmod +x "$HOME/.local/share/claude/versions/$ver/bin/claude" && \
         rm -f "$bp"; \
     } && \
     INSTALLED=false && \
@@ -137,14 +141,34 @@ RUN set -e && \
     if [ "$INSTALLED" = "false" ]; then \
         echo "ERROR: Could not install any compatible Claude Code version" >&2; exit 1; \
     fi && \
-    if [ -d "$HOME/.local/share/claude/versions" ]; then \
-        latest_dir="$(ls -1d "$HOME/.local/share/claude/versions/"* | sort -V | tail -1)"; \
-        if [ -x "$latest_dir/bin/claude" ]; then \
-            ln -sf "$latest_dir/bin/claude" "$HOME/.local/bin/claude"; \
-        fi; \
-    fi && \
-    command -v claude >/dev/null && \
-    echo "Claude Code installed successfully"
+		# Only symlink if we didn't already install a specific version
+		if [ -n "$CLAUDE_VERSION" ]; then \
+			# When version is pinned, symlink the specific version we just installed
+			INSTALLED_DIR="$HOME/.local/share/claude/versions/$TRY_VERSION"; \
+			if [ -d "$INSTALLED_DIR" ] && [ -x "$INSTALLED_DIR/bin/claude" ]; then \
+				ln -sf "$INSTALLED_DIR/bin/claude" "$HOME/.local/bin/claude"; \
+			fi; \
+		elif [ -d "$HOME/.local/share/claude/versions" ]; then \
+			latest_dir="$(ls -1d "$HOME/.local/share/claude/versions/"* | sort -V | tail -1)"; \
+			if [ -x "$latest_dir/bin/claude" ]; then \
+				ln -sf "$latest_dir/bin/claude" "$HOME/.local/bin/claude"; \
+			fi; \
+		fi && \
+		# Disable auto-updater by setting the environment variable AND writing to settings.json
+		export DISABLE_AUTOUPDATER=1 && \
+		mkdir -p "$HOME/.claude" && \
+		if [ -f "$HOME/.claude/settings.json" ]; then \
+			# Add DISABLE_AUTOUPDATER to existing settings.json
+			if ! grep -q "DISABLE_AUTOUPDATER" "$HOME/.claude/settings.json"; then \
+				sed -i 's/}$/,"env":{"DISABLE_AUTOUPDATER":"1"}\n}/' "$HOME/.claude/settings.json" 2>/dev/null || \
+				echo '{"env":{"DISABLE_AUTOUPDATER":"1"}}' >> "$HOME/.claude/settings.json"; \
+			fi; \
+		else \
+			# Create settings.json with auto-updater disabled
+			echo '{"env":{"DISABLE_AUTOUPDATER":"1"}}' > "$HOME/.claude/settings.json"; \
+		fi && \
+		command -v claude >/dev/null && \
+		echo "Claude Code installed successfully (auto-updater disabled)"
 USER root`, nil
 }
 
@@ -152,6 +176,10 @@ func (c *Claude) GetFullDockerfile(version string) (string, error) {
 	install, err := c.GetDockerfileInstall("")
 	if err != nil {
 		return "", err
+	}
+	// Add CLAUDE_VERSION build arg if version is specified
+	if version != "" {
+		return fmt.Sprintf("FROM exitbox-base\n\nARG CLAUDE_VERSION=%s\n\n", version) + install, nil
 	}
 	return "FROM exitbox-base\n\n" + install, nil
 }

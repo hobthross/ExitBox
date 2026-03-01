@@ -167,6 +167,9 @@ var ForceRebuild bool
 // AutoUpdate enables checking for new agent versions on launch.
 var AutoUpdate bool
 
+// AgentVersion is a pinned agent version (e.g. "1.0.123"). Empty means latest.
+var AgentVersion string
+
 // isReleaseVersion returns true if the version string looks like a release
 // (starts with "v", e.g. "v3.2.0").
 func isReleaseVersion(v string) bool {

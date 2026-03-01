@@ -202,6 +202,20 @@ func TestApplySessionResumeDefaults_NoResumeWins(t *testing.T) {
 	}
 }
 
+func TestParseRunFlags_Version(t *testing.T) {
+	f := parseRunFlags([]string{"--version", "1.0.123"}, config.DefaultFlags{})
+	if f.AgentVersion != "1.0.123" {
+		t.Errorf("expected AgentVersion 1.0.123, got %q", f.AgentVersion)
+	}
+}
+
+func TestParseRunFlags_VersionMissing(t *testing.T) {
+	f := parseRunFlags([]string{"--version"}, config.DefaultFlags{})
+	if f.AgentVersion != "" {
+		t.Errorf("expected empty AgentVersion when value missing, got %q", f.AgentVersion)
+	}
+}
+
 func TestParseRunFlags_FullGitSupportDefault(t *testing.T) {
 	// FullGitSupport is a config-level setting, not a CLI flag.
 	// It's propagated from config.DefaultFlags.FullGitSupport to run.Options.
