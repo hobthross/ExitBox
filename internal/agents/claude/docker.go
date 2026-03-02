@@ -1,5 +1,12 @@
 package claude
 
+import (
+	"fmt"
+	"os"
+
+	"github.com/cloud-exit/exitbox/internal/agent"
+)
+
 func (c *Claude) GetFullDockerfile(version string) (string, error) {
 	install, err := c.GetDockerfileInstall("")
 	if err != nil {
@@ -64,4 +71,15 @@ RUN set -e && \
     command -v claude >/dev/null && \
     echo "Claude Code installed successfully"
 USER root`, nil
+}
+
+func (c *Claude) PrepareBuild(in agent.PrepareBuildInput) error {
+	df, err := c.GetFullDockerfile(in.Version)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(in.DockerfilePath, []byte(df), 0644); err != nil {
+		return fmt.Errorf("failed to write Dockerfile: %w", err)
+	}
+	return nil
 }

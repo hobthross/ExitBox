@@ -2,7 +2,11 @@ package codex
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
+
+	"github.com/cloud-exit/exitbox/internal/agent"
 )
 
 func (c *Codex) GetDockerfileInstall(buildCtx string) (string, error) {
@@ -36,4 +40,40 @@ func (c *Codex) GetFullDockerfile(version string) (string, error) {
 	}
 	df += install
 	return df, nil
+}
+
+func (c *Codex) PrepareBuild(in agent.PrepareBuildInput) error {
+	version := in.Version
+	if version == "" {
+		version = "latest"
+	}
+	binaryName := c.BinaryName()
+	if binaryName == "" {
+		return fmt.Errorf("unsupported architecture for Codex")
+	}
+	if in.Download == nil || in.FileSHA256 == nil {
+		return fmt.Errorf("PrepareBuildInput.Download and FileSHA256 are required for Codex")
+	}
+	url := fmt.Sprintf("https://github.com/%s/releases/download/%s/%s", codexGitHubRepo, version, binaryName)
+	if in.Logf != nil {
+		in.Logf("Downloading Codex %s...", version)
+	}
+	dlPath := filepath.Join(in.BuildDir, binaryName)
+	if err := in.Download(in.Ctx, url, dlPath); err != nil {
+		return fmt.Errorf("failed to download Codex: %w", err)
+	}
+	checksum := in.FileSHA256(dlPath)
+	if in.Logf != nil {
+		in.Logf("Codex SHA-256: %s", checksum)
+	}
+	df := fmt.Sprintf("FROM exitbox-base\n\nARG CODEX_VERSION=%s\nARG CODEX_CHECKSUM=%s\n", version, checksum)
+	install, err := c.GetDockerfileInstall(in.BuildDir)
+	if err != nil {
+		return fmt.Errorf("failed to get Codex install instructions: %w", err)
+	}
+	df += install
+	if err := os.WriteFile(in.DockerfilePath, []byte(df), 0644); err != nil {
+		return fmt.Errorf("failed to write Dockerfile: %w", err)
+	}
+	return nil
 }

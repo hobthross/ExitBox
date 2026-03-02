@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/cloud-exit/exitbox/internal/agent"
+	"github.com/cloud-exit/exitbox/internal/agents"
 	"github.com/cloud-exit/exitbox/internal/config"
 	"github.com/cloud-exit/exitbox/internal/container"
 	"github.com/cloud-exit/exitbox/internal/ui"
@@ -37,7 +38,7 @@ func BuildCore(ctx context.Context, rt container.Runtime, agentName string, forc
 	imageName := fmt.Sprintf("exitbox-%s-core", agentName)
 	cmd := container.Cmd(rt)
 
-	a := agent.Get(agentName)
+	a := agents.Get(agentName)
 	if a == nil {
 		return fmt.Errorf("unknown agent: %s", agentName)
 	}
@@ -106,79 +107,17 @@ func BuildCore(ctx context.Context, rt container.Runtime, agentName string, forc
 
 	dockerfilePath := filepath.Join(buildCtx, "Dockerfile")
 
-	switch agentName {
-	case "claude":
-		df, err := a.GetFullDockerfile(latestVersion)
-		if err != nil {
-			return err
-		}
-		if err := os.WriteFile(dockerfilePath, []byte(df), 0644); err != nil {
-			return fmt.Errorf("failed to write Dockerfile: %w", err)
-		}
-
-	case "codex":
-		codexAgent := a.(*agent.Codex)
-		version := latestVersion
-		if version == "" {
-			version = "latest"
-		}
-
-		binaryName := codexAgent.BinaryName()
-		if binaryName == "" {
-			return fmt.Errorf("unsupported architecture for Codex")
-		}
-
-		// Pre-download binary
-		url := fmt.Sprintf("https://github.com/%s/releases/download/%s/%s", "openai/codex", version, binaryName)
-		ui.Infof("Downloading Codex %s...", version)
-		dlPath := filepath.Join(buildCtx, binaryName)
-		if err := downloadFile(ctx, url, dlPath); err != nil {
-			return fmt.Errorf("failed to download Codex: %w", err)
-		}
-		checksum := fileSHA256(dlPath)
-		ui.Infof("Codex SHA-256: %s", checksum)
-
-		df := fmt.Sprintf("FROM exitbox-base\n\nARG CODEX_VERSION=%s\nARG CODEX_CHECKSUM=%s\n", version, checksum)
-		install, installErr := a.GetDockerfileInstall(buildCtx)
-		if installErr != nil {
-			return fmt.Errorf("failed to get Codex install instructions: %w", installErr)
-		}
-		df += install
-		if err := os.WriteFile(dockerfilePath, []byte(df), 0644); err != nil {
-			return fmt.Errorf("failed to write Dockerfile: %w", err)
-		}
-
-	case "opencode":
-		ocAgent := a.(*agent.OpenCode)
-		version := latestVersion
-		if version == "" {
-			version = "latest"
-		}
-
-		binaryName := ocAgent.BinaryName()
-		if binaryName == "" {
-			return fmt.Errorf("unsupported architecture for OpenCode")
-		}
-
-		// Pre-download binary (use v-prefixed tag for GitHub release URL)
-		url := fmt.Sprintf("https://github.com/anomalyco/opencode/releases/download/v%s/%s", version, binaryName)
-		ui.Infof("Downloading OpenCode %s...", version)
-		dlPath := filepath.Join(buildCtx, binaryName)
-		if err := downloadFile(ctx, url, dlPath); err != nil {
-			return fmt.Errorf("failed to download OpenCode: %w", err)
-		}
-		checksum := fileSHA256(dlPath)
-		ui.Infof("OpenCode SHA-256: %s", checksum)
-
-		df := fmt.Sprintf("FROM exitbox-base\n\nARG OPENCODE_VERSION=%s\nARG OPENCODE_CHECKSUM=%s\n", version, checksum)
-		install, installErr := a.GetDockerfileInstall(buildCtx)
-		if installErr != nil {
-			return fmt.Errorf("failed to get OpenCode install instructions: %w", installErr)
-		}
-		df += install
-		if err := os.WriteFile(dockerfilePath, []byte(df), 0644); err != nil {
-			return fmt.Errorf("failed to write Dockerfile: %w", err)
-		}
+	prepareInput := agent.PrepareBuildInput{
+		Ctx:            ctx,
+		Version:        latestVersion,
+		BuildDir:       buildCtx,
+		DockerfilePath: dockerfilePath,
+		Download:       downloadFile,
+		FileSHA256:     fileSHA256,
+		Logf:           ui.Infof,
+	}
+	if err := a.PrepareBuild(prepareInput); err != nil {
+		return err
 	}
 
 	// Add labels

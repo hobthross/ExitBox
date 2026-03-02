@@ -17,6 +17,8 @@
 package agent
 
 import (
+	"context"
+
 	"github.com/cloud-exit/exitbox/internal/container"
 	"github.com/cloud-exit/exitbox/internal/generate"
 )
@@ -33,6 +35,30 @@ type ConfigGenerator interface {
 
 type LogLocationProvider interface {
 	LogSearchDirs(home, agentCfgDir string) []string
+}
+
+type PrepareBuildProvider interface {
+	// PrepareBuild prepares the build context (downloads binaries, writes Dockerfile) for the agent's core image.
+	PrepareBuild(in PrepareBuildInput) error
+}
+
+// PrepareBuildInput holds parameters for preparing an agent's Docker build context.
+// It is passed to Agent.PrepareBuild to support download, checksum, and logging.
+type PrepareBuildInput struct {
+	// Ctx is the context for cancellable operations (e.g. HTTP downloads).
+	Ctx context.Context
+	// Version is the agent version to build (e.g. "v1.0.0" or "latest").
+	Version string
+	// BuildDir is the build context directory (artifacts like pre-downloaded binaries go here).
+	BuildDir string
+	// DockerfilePath is the path where the Dockerfile must be written.
+	DockerfilePath string
+	// Download performs an HTTP GET and writes the response to dest. May be nil if agent needs no downloads.
+	Download func(ctx context.Context, url, dest string) error
+	// FileSHA256 returns the SHA-256 hex digest of the file at path. May be nil if agent needs no checksums.
+	FileSHA256 func(path string) string
+	// Logf logs an informational message. May be nil (logging is skipped).
+	Logf func(format string, args ...interface{})
 }
 
 // Agent is the interface that all agent implementations must satisfy.
@@ -53,6 +79,7 @@ type AgentEntity interface {
 	Agent
 	ConfigGenerator
 	LogLocationProvider
+	PrepareBuildProvider
 }
 
 // AgentNames is the list of all supported agent names.
