@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/cloud-exit/exitbox/internal/agent"
+	"github.com/cloud-exit/exitbox/internal/config"
+	"github.com/cloud-exit/exitbox/internal/fsutil"
 )
 
 type OpenCode struct{}
@@ -44,6 +46,31 @@ func (o *OpenCode) ContainerMounts(cfgDir string) []agent.Mount {
 		{Source: filepath.Join(cfgDir, ".config", "opencode"), Target: "/home/user/.config/opencode"},
 		{Source: filepath.Join(cfgDir, ".local", "share", "opencode"), Target: "/home/user/.local/share/opencode"},
 	}
+}
+
+func (o *OpenCode) EnsureWorkspaceAgentConfig(workspaceName string) error {
+	if workspaceName == "" {
+		return nil
+	}
+	root := config.WorkspaceAgentDir(workspaceName, o.Name())
+	_ = os.MkdirAll(root, 0755)
+	home := os.Getenv("HOME")
+
+	ocDir := fsutil.EnsureDir(root, ".opencode")
+	fsutil.SeedDirOnce(filepath.Join(home, ".opencode"), ocDir)
+
+	ocCfg := fsutil.EnsureDir(root, ".config", "opencode")
+	fsutil.SeedDirOnce(filepath.Join(home, ".config", "opencode"), ocCfg)
+
+	ocShare := fsutil.EnsureDir(root, ".local", "share", "opencode")
+	fsutil.SeedDirOnce(filepath.Join(home, ".local", "share", "opencode"), ocShare)
+
+	ocState := fsutil.EnsureDir(root, ".local", "state")
+	fsutil.SeedDirOnce(filepath.Join(home, ".local", "state"), ocState)
+
+	ocCache := fsutil.EnsureDir(root, ".cache", "opencode")
+	fsutil.SeedDirOnce(filepath.Join(home, ".cache", "opencode"), ocCache)
+	return nil
 }
 
 func (o *OpenCode) DetectHostConfig() (string, error) {

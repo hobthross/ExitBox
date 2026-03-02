@@ -116,3 +116,8 @@ func VaultFile(workspace string) string {
 func KVDir(workspace string) string {
 	return filepath.Join(Data, "kv", workspace)
 }
+
+// WorkspaceAgentDir returns the host path for a workspace's agent config.
+func WorkspaceAgentDir(workspaceName, agentName string) string {
+	return filepath.Join(Home, "profiles", "global", workspaceName, agentName)
+}

@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/cloud-exit/exitbox/internal/agent"
+	"github.com/cloud-exit/exitbox/internal/config"
+	"github.com/cloud-exit/exitbox/internal/fsutil"
 )
 
 type Codex struct{}
@@ -43,6 +45,22 @@ func (c *Codex) ContainerMounts(cfgDir string) []agent.Mount {
 		{Source: filepath.Join(cfgDir, ".codex"), Target: "/home/user/.codex"},
 		{Source: filepath.Join(cfgDir, ".config", "codex"), Target: "/home/user/.config/codex"},
 	}
+}
+
+func (c *Codex) EnsureWorkspaceAgentConfig(workspaceName string) error {
+	if workspaceName == "" {
+		return nil
+	}
+	root := config.WorkspaceAgentDir(workspaceName, c.Name())
+	_ = os.MkdirAll(root, 0755)
+	home := os.Getenv("HOME")
+
+	codexDir := fsutil.EnsureDir(root, ".codex")
+	fsutil.SeedDirOnce(filepath.Join(home, ".codex"), codexDir)
+
+	codexCfg := fsutil.EnsureDir(root, ".config", "codex")
+	fsutil.SeedDirOnce(filepath.Join(home, ".config", "codex"), codexCfg)
+	return nil
 }
 
 func (c *Codex) DetectHostConfig() (string, error) {

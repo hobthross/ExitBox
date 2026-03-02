@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 
 	"github.com/cloud-exit/exitbox/internal/agent"
+	"github.com/cloud-exit/exitbox/internal/config"
+	"github.com/cloud-exit/exitbox/internal/fsutil"
 )
 
 const (
@@ -40,6 +42,25 @@ func (c *Claude) DetectHostConfig() (string, error) {
 		return dir, nil
 	}
 	return "", fmt.Errorf("no Claude config found")
+}
+
+func (c *Claude) EnsureWorkspaceAgentConfig(workspaceName string) error {
+	if workspaceName == "" {
+		return nil
+	}
+	root := config.WorkspaceAgentDir(workspaceName, c.Name())
+	_ = os.MkdirAll(root, 0755)
+	home := os.Getenv("HOME")
+
+	claudeDir := fsutil.EnsureDir(root, ".claude")
+	fsutil.SeedDirOnce(filepath.Join(home, ".claude"), claudeDir)
+
+	claudeJSON := fsutil.EnsureFile(root, ".claude.json")
+	fsutil.SeedFileOnce(filepath.Join(home, ".claude.json"), claudeJSON)
+
+	cfgDir := fsutil.EnsureDir(root, ".config")
+	fsutil.SeedDirOnce(filepath.Join(home, ".config"), cfgDir)
+	return nil
 }
 
 func (c *Claude) ImportConfig(src, dst string) error {

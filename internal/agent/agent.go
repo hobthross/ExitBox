@@ -42,6 +42,13 @@ type PrepareBuildProvider interface {
 	PrepareBuild(in PrepareBuildInput) error
 }
 
+// WorkspaceConfigEnsurer ensures workspace-specific agent config directories exist
+// and seeds them from host config when empty.
+type WorkspaceConfigEnsurer interface {
+	// EnsureWorkspaceAgentConfig creates and seeds agent config dirs for the given workspace.
+	EnsureWorkspaceAgentConfig(workspaceName string) error
+}
+
 // PrepareBuildInput holds parameters for preparing an agent's Docker build context.
 // It is passed to Agent.PrepareBuild to support download, checksum, and logging.
 type PrepareBuildInput struct {
@@ -80,6 +87,7 @@ type AgentEntity interface {
 	ConfigGenerator
 	LogLocationProvider
 	PrepareBuildProvider
+	WorkspaceConfigEnsurer
 }
 
 // AgentNames is the list of all supported agent names.

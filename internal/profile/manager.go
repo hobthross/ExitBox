@@ -18,13 +18,12 @@ package profile
 
 import (
 	"fmt"
-	"io"
-	"io/fs"
 	"os"
-	"path/filepath"
 	"strings"
 
+	"github.com/cloud-exit/exitbox/internal/agents"
 	"github.com/cloud-exit/exitbox/internal/config"
+	"github.com/cloud-exit/exitbox/internal/fsutil"
 )
 
 const (
@@ -141,51 +140,19 @@ func RemoveWorkspace(name string, cfg *config.Config) error {
 
 // WorkspaceAgentDir returns host path for workspace agent config.
 func WorkspaceAgentDir(workspaceName, agent string) string {
-	return filepath.Join(config.Home, "profiles", ScopeGlobal, workspaceName, agent)
+	return config.WorkspaceAgentDir(workspaceName, agent)
 }
 
 // EnsureAgentConfig ensures agent config directories exist for active workspace.
-func EnsureAgentConfig(workspaceName, agent string) error {
+func EnsureAgentConfig(workspaceName, agentName string) error {
 	if workspaceName == "" {
 		return nil
 	}
-	root := WorkspaceAgentDir(workspaceName, agent)
-	_ = os.MkdirAll(root, 0755)
-
-	home := os.Getenv("HOME")
-	switch agent {
-	case "claude":
-		claudeDir := ensureDir(root, ".claude")
-		seedDirOnce(filepath.Join(home, ".claude"), claudeDir)
-
-		claudeJSON := ensureFile(root, ".claude.json")
-		seedFileOnce(filepath.Join(home, ".claude.json"), claudeJSON)
-
-		cfgDir := ensureDir(root, ".config")
-		seedDirOnce(filepath.Join(home, ".config"), cfgDir)
-	case "codex":
-		codexDir := ensureDir(root, ".codex")
-		seedDirOnce(filepath.Join(home, ".codex"), codexDir)
-
-		codexCfg := ensureDir(root, ".config", "codex")
-		seedDirOnce(filepath.Join(home, ".config", "codex"), codexCfg)
-	case "opencode":
-		ocDir := ensureDir(root, ".opencode")
-		seedDirOnce(filepath.Join(home, ".opencode"), ocDir)
-
-		ocCfg := ensureDir(root, ".config", "opencode")
-		seedDirOnce(filepath.Join(home, ".config", "opencode"), ocCfg)
-
-		ocShare := ensureDir(root, ".local", "share", "opencode")
-		seedDirOnce(filepath.Join(home, ".local", "share", "opencode"), ocShare)
-
-		ocState := ensureDir(root, ".local", "state")
-		seedDirOnce(filepath.Join(home, ".local", "state"), ocState)
-
-		ocCache := ensureDir(root, ".cache", "opencode")
-		seedDirOnce(filepath.Join(home, ".cache", "opencode"), ocCache)
+	agt := agents.Get(agentName)
+	if agt == nil {
+		return nil
 	}
-	return nil
+	return agt.EnsureWorkspaceAgentConfig(workspaceName)
 }
 
 // CopyWorkspaceCredentials copies all agent credentials from one workspace to another.
@@ -202,7 +169,7 @@ func CopyWorkspaceCredentials(srcWorkspace, dstWorkspace string, agents []string
 		}
 		dstDir := WorkspaceAgentDir(dstWorkspace, agentName)
 		_ = os.MkdirAll(dstDir, 0755)
-		if err := copyDirRecursive(srcDir, dstDir); err != nil {
+		if err := fsutil.CopyDirRecursive(srcDir, dstDir); err != nil {
 			return fmt.Errorf("copying %s credentials from '%s' to '%s': %w", agentName, srcWorkspace, dstWorkspace, err)
 		}
 	}
@@ -236,90 +203,6 @@ func deleteByName(list []config.Workspace, name string) []config.Workspace {
 		}
 	}
 	return out
-}
-
-func ensureDir(parts ...string) string {
-	p := filepath.Join(parts...)
-	_ = os.MkdirAll(p, 0755)
-	return p
-}
-
-func ensureFile(parts ...string) string {
-	p := filepath.Join(parts...)
-	_ = os.MkdirAll(filepath.Dir(p), 0755)
-	if _, err := os.Stat(p); os.IsNotExist(err) {
-		_ = os.WriteFile(p, []byte("{}\n"), 0644)
-	}
-	return p
-}
-
-func seedDirOnce(host, managed string) {
-	if _, err := os.Stat(host); os.IsNotExist(err) {
-		return
-	}
-	entries, err := os.ReadDir(managed)
-	if err == nil && len(entries) > 0 {
-		return
-	}
-	_ = os.MkdirAll(managed, 0755)
-	_ = copyDirRecursive(host, managed)
-}
-
-func copyDirRecursive(src, dst string) error {
-	return filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		rel, err := filepath.Rel(src, path)
-		if err != nil {
-			return err
-		}
-		target := filepath.Join(dst, rel)
-		if d.IsDir() {
-			return os.MkdirAll(target, 0755)
-		}
-
-		// Handle symlinks: recreate them instead of following.
-		if d.Type()&os.ModeSymlink != 0 {
-			link, err := os.Readlink(path)
-			if err != nil {
-				return nil // skip unreadable symlinks
-			}
-			_ = os.Remove(target)
-			return os.Symlink(link, target)
-		}
-
-		return copyFile(path, target)
-	})
-}
-
-func copyFile(src, dst string) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-	out, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-	_, err = io.Copy(out, in)
-	return err
-}
-
-func seedFileOnce(host, managed string) {
-	if _, err := os.Stat(host); os.IsNotExist(err) {
-		return
-	}
-	if _, err := os.Stat(managed); err == nil {
-		return
-	}
-	_ = os.MkdirAll(filepath.Dir(managed), 0755)
-	data, err := os.ReadFile(host)
-	if err == nil {
-		_ = os.WriteFile(managed, data, 0644)
-	}
 }
 
 // FindWorkspace returns a workspace by name (case-insensitive), or nil.
