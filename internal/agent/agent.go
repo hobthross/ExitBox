@@ -31,6 +31,10 @@ type ConfigGenerator interface {
 	GenerateConfig(cfg generate.ServerConfig) (map[string]interface{}, error)
 }
 
+type LogLocationProvider interface {
+	LogSearchDirs(home, agentCfgDir string) []string
+}
+
 // Agent is the interface that all agent implementations must satisfy.
 type Agent interface {
 	Name() string
@@ -48,6 +52,7 @@ type Agent interface {
 type AgentEntity interface {
 	Agent
 	ConfigGenerator
+	LogLocationProvider
 }
 
 // AgentNames is the list of all supported agent names.

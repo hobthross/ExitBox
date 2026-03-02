@@ -1,6 +1,8 @@
 package opencode
 
 import (
+	"path/filepath"
+
 	"github.com/cloud-exit/exitbox/internal/generate"
 )
 
@@ -31,4 +33,15 @@ func (o *OpenCode) GenerateConfig(cfg generate.ServerConfig) (map[string]interfa
 		}
 	}
 	return result, nil
+}
+
+// LogSearchDirs returns directories to search for OpenCode log files.
+func (o *OpenCode) LogSearchDirs(home, agentCfgDir string) []string {
+	return []string{
+		filepath.Join(home, ".local", "share", "opencode", "log"),
+		filepath.Join(home, ".local", "share", "opencode", "logs"),
+		filepath.Join(home, ".opencode"),
+		filepath.Join(agentCfgDir, ".opencode"),
+		filepath.Join(agentCfgDir, ".config", "opencode"),
+	}
 }

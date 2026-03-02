@@ -1,6 +1,8 @@
 package claude
 
 import (
+	"path/filepath"
+
 	"github.com/cloud-exit/exitbox/internal/generate"
 )
 
@@ -14,4 +16,12 @@ func (c *Claude) GenerateConfig(cfg generate.ServerConfig) (map[string]interface
 		m["apiKey"] = cfg.APIKey
 	}
 	return m, nil
+}
+
+// LogSearchDirs returns directories to search for Claude Code log files.
+func (c *Claude) LogSearchDirs(home, agentCfgDir string) []string {
+	return []string{
+		filepath.Join(home, ".claude"),
+		filepath.Join(agentCfgDir, ".claude"),
+	}
 }

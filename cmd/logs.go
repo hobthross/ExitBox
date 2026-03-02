@@ -22,7 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/cloud-exit/exitbox/internal/agent"
+	"github.com/cloud-exit/exitbox/internal/agents"
 	"github.com/cloud-exit/exitbox/internal/config"
 	"github.com/cloud-exit/exitbox/internal/ui"
 	"github.com/spf13/cobra"
@@ -34,36 +34,17 @@ var logsCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		name := args[0]
-		if !agent.IsValidAgent(name) {
+
+		a := agents.Get(name)
+		if a == nil {
 			ui.Errorf("Unknown agent: %s", name)
+			return
 		}
 
 		home := os.Getenv("HOME")
 		agentCfgDir := config.AgentDir(name)
 
-		var searchDirs []string
-		switch name {
-		case "claude":
-			searchDirs = []string{
-				filepath.Join(home, ".claude"),
-				filepath.Join(agentCfgDir, ".claude"),
-			}
-		case "codex":
-			searchDirs = []string{
-				filepath.Join(home, ".codex"),
-				filepath.Join(home, ".config", "codex"),
-				filepath.Join(agentCfgDir, ".codex"),
-				filepath.Join(agentCfgDir, ".config", "codex"),
-			}
-		case "opencode":
-			searchDirs = []string{
-				filepath.Join(home, ".local", "share", "opencode", "log"),
-				filepath.Join(home, ".local", "share", "opencode", "logs"),
-				filepath.Join(home, ".opencode"),
-				filepath.Join(agentCfgDir, ".opencode"),
-				filepath.Join(agentCfgDir, ".config", "opencode"),
-			}
-		}
+		searchDirs := a.LogSearchDirs(home, agentCfgDir)
 		searchDirs = append(searchDirs, agentCfgDir)
 
 		// Find log files
