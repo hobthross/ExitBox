@@ -12,7 +12,7 @@ import (
 
 type Codex struct{}
 
-var _ agent.Agent = (*Codex)(nil)
+var _ agent.AgentEntity = (*Codex)(nil)
 
 func (c *Codex) Name() string        { return "codex" }
 func (c *Codex) DisplayName() string { return "OpenAI Codex" }

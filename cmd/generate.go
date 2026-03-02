@@ -23,6 +23,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/cloud-exit/exitbox/internal/agents"
 	"github.com/cloud-exit/exitbox/internal/config"
 	"github.com/cloud-exit/exitbox/internal/generate"
 	"github.com/cloud-exit/exitbox/internal/profile"
@@ -164,15 +165,12 @@ func runGenerate(agentName, displayName, workspaceFlag string) {
 	}
 
 	// Generate agent-specific config.
-	var configData map[string]interface{}
-	switch agentName {
-	case "opencode":
-		configData = generate.GenerateOpenCode(serverCfg)
-	case "claude":
-		configData = generate.GenerateClaude(serverCfg)
-	case "codex":
-		configData = generate.GenerateCodex(serverCfg)
+	agt := agents.Get(agentName)
+	if agt == nil {
+		ui.Errorf("Unknown agent: %s", agentName)
+		return
 	}
+	configData, _ := agt.GenerateConfig(serverCfg)
 
 	// Ensure agent config directory exists.
 	if err := profile.EnsureAgentConfig(workspaceName, agentName); err != nil {

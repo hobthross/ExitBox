@@ -18,12 +18,17 @@ package agent
 
 import (
 	"github.com/cloud-exit/exitbox/internal/container"
+	"github.com/cloud-exit/exitbox/internal/generate"
 )
 
 // Mount describes a volume mount for a container.
 type Mount struct {
 	Source string
 	Target string
+}
+
+type ConfigGenerator interface {
+	GenerateConfig(cfg generate.ServerConfig) (map[string]interface{}, error)
 }
 
 // Agent is the interface that all agent implementations must satisfy.
@@ -38,6 +43,11 @@ type Agent interface {
 	ContainerMounts(cfgDir string) []Mount
 	DetectHostConfig() (string, error)
 	ImportConfig(src, dst string) error
+}
+
+type AgentEntity interface {
+	Agent
+	ConfigGenerator
 }
 
 // AgentNames is the list of all supported agent names.
