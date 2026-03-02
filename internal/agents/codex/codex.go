@@ -19,6 +19,12 @@ var _ agent.AgentEntity = (*Codex)(nil)
 func (c *Codex) Name() string        { return "codex" }
 func (c *Codex) DisplayName() string { return "OpenAI Codex" }
 
+func (c *Codex) OllamaEnvVars(ollamaBaseURL string) []string {
+	return []string{
+		"OPENAI_BASE_URL=" + ollamaBaseURL + "/v1",
+	}
+}
+
 // BinaryName returns the platform-specific binary tarball name.
 func (c *Codex) BinaryName() string {
 	arch := runtime.GOARCH

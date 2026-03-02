@@ -88,6 +88,7 @@ type AgentEntity interface {
 	LogLocationProvider
 	PrepareBuildProvider
 	WorkspaceConfigEnsurer
+	OllamaEnvVars(ollamaBaseURL string) []string
 }
 
 // AgentNames is the list of all supported agent names.

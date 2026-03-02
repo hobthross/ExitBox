@@ -19,6 +19,12 @@ var _ agent.AgentEntity = (*OpenCode)(nil)
 func (o *OpenCode) Name() string        { return "opencode" }
 func (o *OpenCode) DisplayName() string { return "OpenCode" }
 
+func (o *OpenCode) OllamaEnvVars(ollamaBaseURL string) []string {
+	return []string{
+		"OLLAMA_HOST=" + ollamaBaseURL,
+	}
+}
+
 // BinaryName returns the platform-specific binary tarball name (musl build for Alpine).
 func (o *OpenCode) BinaryName() string {
 	arch := runtime.GOARCH
