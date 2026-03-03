@@ -19,8 +19,11 @@ func All() []agent.AgentEntity {
 	return result
 }
 
-func Names() []string {
-	names := make([]string, 0, len(registry))
+// Names returns agent names from the registry. If prefix is passed, those strings
+// are prepended to the result.
+func Names(prefix ...string) []string {
+	names := make([]string, 0, len(prefix)+len(registry))
+	names = append(names, prefix...)
 	for name := range registry {
 		names = append(names, name)
 	}

@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/cloud-exit/exitbox/internal/agent"
+	"github.com/cloud-exit/exitbox/internal/agents"
 	"github.com/cloud-exit/exitbox/internal/config"
 	"github.com/cloud-exit/exitbox/internal/profile"
 	"github.com/cloud-exit/exitbox/internal/session"
@@ -97,7 +98,7 @@ func newSessionsListCmd() *cobra.Command {
 	cmd.Flags().StringVar(&agentFilter, "agent", "all", "Agent filter: claude|codex|opencode|all")
 	_ = cmd.RegisterFlagCompletionFunc("workspace", completeWorkspaceFlagValues)
 	_ = cmd.RegisterFlagCompletionFunc("agent", func(_ *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		candidates := []string{"all", "claude", "codex", "opencode"}
+		candidates := agents.Names("all")
 		var out []string
 		for _, c := range candidates {
 			if strings.HasPrefix(c, toComplete) {
@@ -171,7 +172,7 @@ func newSessionsRemoveCmd() *cobra.Command {
 	cmd.Flags().StringVar(&agentFilter, "agent", "all", "Agent filter: claude|codex|opencode|all")
 	_ = cmd.RegisterFlagCompletionFunc("workspace", completeWorkspaceFlagValues)
 	_ = cmd.RegisterFlagCompletionFunc("agent", func(_ *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		candidates := []string{"all", "claude", "codex", "opencode"}
+		candidates := agents.Names("all")
 		var out []string
 		for _, c := range candidates {
 			if strings.HasPrefix(c, toComplete) {
