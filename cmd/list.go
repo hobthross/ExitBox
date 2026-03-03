@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/cloud-exit/exitbox/internal/agents"
 	"github.com/cloud-exit/exitbox/internal/config"
 	"github.com/cloud-exit/exitbox/internal/container"
 	"github.com/cloud-exit/exitbox/internal/ui"
@@ -42,32 +43,23 @@ var listCmd = &cobra.Command{
 		fmt.Printf("  %-12s %-15s %-10s %-10s\n", "AGENT", "DISPLAY NAME", "ENABLED", "IMAGE")
 		fmt.Printf("  %-12s %-15s %-10s %-10s\n", "-----", "------------", "-------", "-----")
 
-		agents := []struct {
-			Name    string
-			Display string
-		}{
-			{"claude", "Claude Code"},
-			{"codex", "OpenAI Codex"},
-			{"opencode", "OpenCode"},
-		}
-
-		for _, a := range agents {
+		for _, a := range agents.All() {
 			enabledText := "no"
 			enabledColor := ui.Dim
-			if cfg.IsAgentEnabled(a.Name) {
+			if cfg.IsAgentEnabled(a.Name()) {
 				enabledText = "yes"
 				enabledColor = ui.Green
 			}
 
 			imageText := "not built"
 			imageColor := ui.Dim
-			if rt != nil && rt.ImageExists("exitbox-"+a.Name+"-core") {
+			if rt != nil && rt.ImageExists("exitbox-"+a.Name()+"-core") {
 				imageText = "built"
 				imageColor = ui.Green
 			}
 
 			fmt.Printf("  %-12s %-15s %s%-10s%s %s%-10s%s\n",
-				a.Name, a.Display,
+				a.Name(), a.DisplayName(),
 				enabledColor, enabledText, ui.NC,
 				imageColor, imageText, ui.NC)
 		}
