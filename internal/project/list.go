@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/cloud-exit/exitbox/internal/agents"
 	"github.com/cloud-exit/exitbox/internal/config"
 	"github.com/cloud-exit/exitbox/internal/container"
 	"github.com/cloud-exit/exitbox/internal/ui"
@@ -59,11 +60,11 @@ func ListAll(rt container.Runtime) {
 
 		// Check which agents have images (any profile variant)
 		var agentsList []string
-		for _, agent := range []string{"claude", "codex", "opencode"} {
-			prefix := fmt.Sprintf("exitbox-%s-%s-*", agent, e.Name())
+		for _, agentName := range agents.Names() {
+			prefix := fmt.Sprintf("exitbox-%s-%s-*", agentName, e.Name())
 			if rt != nil {
 				if imgs, err := rt.ImageList(prefix); err == nil && len(imgs) > 0 {
-					agentsList = append(agentsList, agent)
+					agentsList = append(agentsList, agentName)
 				}
 			}
 		}

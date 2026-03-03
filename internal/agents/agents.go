@@ -11,6 +11,22 @@ func Get(name string) agent.AgentEntity {
 	return registry[name]
 }
 
+func All() []agent.AgentEntity {
+	result := make([]agent.AgentEntity, 0, len(registry))
+	for _, a := range registry {
+		result = append(result, a)
+	}
+	return result
+}
+
+func Names() []string {
+	names := make([]string, 0, len(registry))
+	for name := range registry {
+		names = append(names, name)
+	}
+	return names
+}
+
 // registry holds all agent implementations.
 var registry = map[string]agent.AgentEntity{}
 
