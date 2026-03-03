@@ -19,18 +19,14 @@ package agent
 import (
 	"context"
 
+	"github.com/cloud-exit/exitbox/internal/config"
 	"github.com/cloud-exit/exitbox/internal/container"
-	"github.com/cloud-exit/exitbox/internal/generate"
 )
 
 // Mount describes a volume mount for a container.
 type Mount struct {
 	Source string
 	Target string
-}
-
-type ConfigGenerator interface {
-	GenerateConfig(cfg generate.ServerConfig) (map[string]interface{}, error)
 }
 
 type LogLocationProvider interface {
@@ -77,11 +73,12 @@ type Agent interface {
 
 type AgentEntity interface {
 	Agent
-	ConfigGenerator
+	GenerateConfig(cfg config.ServerConfig) (map[string]interface{}, error)
 	LogLocationProvider
 	PrepareBuildProvider
 	WorkspaceConfigEnsurer
 	OllamaEnvVars(ollamaBaseURL string) []string
+	ConfigFilePath(agentDir string) string
 }
 
 // AgentNames is the list of all supported agent names.

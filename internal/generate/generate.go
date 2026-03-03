@@ -27,18 +27,6 @@ import (
 	"time"
 )
 
-// ServerConfig holds the user-provided server configuration.
-type ServerConfig struct {
-	ProviderID   string // slug, e.g. "local"
-	ProviderName string // display name, e.g. "Qwen3.5-397B (local)"
-	BaseURL      string // e.g. "http://localhost:8080/v1"
-	APIKey       string // may be empty or vault reference
-	ModelID      string // e.g. "qwen3.5-397b"
-	ModelName    string // e.g. "Qwen3.5-397B-A17B"
-	VaultKeyName string // non-empty when key is stored in vault
-	Compaction   bool   // OpenCode: enable auto compaction with pruning
-}
-
 // ModelInfo describes a model returned by the /models endpoint.
 type ModelInfo struct {
 	ID string `json:"id"`
@@ -83,55 +71,6 @@ func TestServer(baseURL, apiKey string) ([]ModelInfo, error) {
 	}
 
 	return result.Data, nil
-}
-
-// GenerateOpenCode produces an OpenCode config map.
-func GenerateOpenCode(cfg ServerConfig) map[string]interface{} {
-	result := map[string]interface{}{
-		"$schema": "https://opencode.ai/config.json",
-		"provider": map[string]interface{}{
-			cfg.ProviderID: map[string]interface{}{
-				"npm":  "@ai-sdk/openai-compatible",
-				"name": cfg.ProviderName,
-				"options": map[string]interface{}{
-					"baseURL": cfg.BaseURL,
-				},
-				"models": map[string]interface{}{
-					cfg.ModelID: map[string]interface{}{
-						"name": cfg.ModelName,
-					},
-				},
-			},
-		},
-		"model": cfg.ProviderID + "/" + cfg.ModelID,
-	}
-	if cfg.Compaction {
-		result["compaction"] = map[string]interface{}{
-			"auto":  true,
-			"prune": true,
-		}
-	}
-	return result
-}
-
-// GenerateClaude produces a Claude Code settings.json config map.
-func GenerateClaude(cfg ServerConfig) map[string]interface{} {
-	m := map[string]interface{}{
-		"apiBaseUrl": cfg.BaseURL,
-		"model":      cfg.ModelID,
-	}
-	if cfg.APIKey != "" && cfg.VaultKeyName == "" {
-		m["apiKey"] = cfg.APIKey
-	}
-	return m
-}
-
-// GenerateCodex produces a Codex config.json config map.
-func GenerateCodex(cfg ServerConfig) map[string]interface{} {
-	return map[string]interface{}{
-		"model":    cfg.ProviderID + "/" + cfg.ModelID,
-		"provider": cfg.BaseURL,
-	}
 }
 
 // MergeJSON deep-merges generated values into existing, returning a new map.
@@ -212,7 +151,6 @@ func ExtractConfigHosts(agentDir, agentName string) []string {
 	if path == "" {
 		return nil
 	}
-
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return nil

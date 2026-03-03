@@ -149,7 +149,7 @@ func runGenerate(agentName, displayName, workspaceFlag string) {
 	providerID := promptString("Provider ID (slug)", defaultSlug)
 
 	// Build server config.
-	serverCfg := generate.ServerConfig{
+	serverCfg := config.ServerConfig{
 		ProviderID:   providerID,
 		ProviderName: providerName,
 		BaseURL:      baseURL,

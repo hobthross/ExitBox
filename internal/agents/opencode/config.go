@@ -3,11 +3,11 @@ package opencode
 import (
 	"path/filepath"
 
-	"github.com/cloud-exit/exitbox/internal/generate"
+	"github.com/cloud-exit/exitbox/internal/config"
 )
 
 // GenerateConfig produces an OpenCode config map.
-func (o *OpenCode) GenerateConfig(cfg generate.ServerConfig) (map[string]interface{}, error) {
+func (o *OpenCode) GenerateConfig(cfg config.ServerConfig) (map[string]interface{}, error) {
 	result := map[string]interface{}{
 		"$schema": "https://opencode.ai/config.json",
 		"provider": map[string]interface{}{
@@ -44,4 +44,8 @@ func (o *OpenCode) LogSearchDirs(home, agentCfgDir string) []string {
 		filepath.Join(agentCfgDir, ".opencode"),
 		filepath.Join(agentCfgDir, ".config", "opencode"),
 	}
+}
+
+func (o *OpenCode) ConfigFilePath(agentDir string) string {
+	return filepath.Join(agentDir, ".config", "opencode", "opencode.json")
 }
