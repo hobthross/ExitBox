@@ -47,9 +47,9 @@ Examples:
   exitbox generate codex                 Configure Codex for a custom provider`,
 	}
 
-	cmd.AddCommand(newGenerateAgentCmd("opencode", "OpenCode"))
-	cmd.AddCommand(newGenerateAgentCmd("claude", "Claude Code"))
-	cmd.AddCommand(newGenerateAgentCmd("codex", "Codex"))
+	for _, agt := range agents.All() {
+		cmd.AddCommand(newGenerateAgentCmd(agt.Name(), agt.DisplayName()))
+	}
 	return cmd
 }
 
