@@ -29,3 +29,11 @@ func (c *Claude) LogSearchDirs(home, agentCfgDir string) []string {
 func (c *Claude) ConfigFilePath(agentDir string) string {
 	return filepath.Join(agentDir, ".claude", "settings.json")
 }
+
+// ExtractConfigServerURLs reads the top-level apiBaseUrl from a Claude config.
+func (c *Claude) ExtractConfigServerURLs(data map[string]interface{}) []string {
+	if baseURL, ok := data["apiBaseUrl"].(string); ok && baseURL != "" {
+		return []string{baseURL}
+	}
+	return nil
+}

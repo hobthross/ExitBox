@@ -151,56 +151,9 @@ func ExtractConfigHosts(agentDir, agentName string) []string {
 		return nil
 	}
 
-	var urls []string
-	switch agentName {
-	case "opencode":
-		urls = extractOpenCodeURLs(data)
-	case "claude":
-		urls = extractClaudeURLs(data)
-	case "codex":
-		urls = extractCodexURLs(data)
-	}
+	urls := agt.ExtractConfigServerURLs(data)
 
 	return deduplicateHosts(urls)
-}
-
-// extractOpenCodeURLs walks provider.*.options.baseURL in an OpenCode config.
-func extractOpenCodeURLs(data map[string]interface{}) []string {
-	providers, ok := data["provider"].(map[string]interface{})
-	if !ok {
-		return nil
-	}
-	var urls []string
-	for _, pv := range providers {
-		provider, ok := pv.(map[string]interface{})
-		if !ok {
-			continue
-		}
-		opts, ok := provider["options"].(map[string]interface{})
-		if !ok {
-			continue
-		}
-		if baseURL, ok := opts["baseURL"].(string); ok && baseURL != "" {
-			urls = append(urls, baseURL)
-		}
-	}
-	return urls
-}
-
-// extractClaudeURLs reads the top-level apiBaseUrl from a Claude config.
-func extractClaudeURLs(data map[string]interface{}) []string {
-	if baseURL, ok := data["apiBaseUrl"].(string); ok && baseURL != "" {
-		return []string{baseURL}
-	}
-	return nil
-}
-
-// extractCodexURLs reads the top-level provider URL from a Codex config.
-func extractCodexURLs(data map[string]interface{}) []string {
-	if provider, ok := data["provider"].(string); ok && provider != "" {
-		return []string{provider}
-	}
-	return nil
 }
 
 // deduplicateHosts extracts host:port from URLs and returns a unique list,

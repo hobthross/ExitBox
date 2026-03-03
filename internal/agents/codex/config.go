@@ -26,3 +26,11 @@ func (c *Codex) LogSearchDirs(home, agentCfgDir string) []string {
 func (c *Codex) ConfigFilePath(agentDir string) string {
 	return filepath.Join(agentDir, ".codex", "config.json")
 }
+
+// ExtractConfigServerURLs reads the top-level provider URL from a Codex config.
+func (c *Codex) ExtractConfigServerURLs(data map[string]interface{}) []string {
+	if provider, ok := data["provider"].(string); ok && provider != "" {
+		return []string{provider}
+	}
+	return nil
+}

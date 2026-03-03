@@ -79,6 +79,8 @@ type AgentEntity interface {
 	WorkspaceConfigEnsurer
 	OllamaEnvVars(ollamaBaseURL string) []string
 	ConfigFilePath(agentDir string) string
+	// ExtractConfigServerURLs returns server URLs from parsed agent config JSON.
+	ExtractConfigServerURLs(data map[string]interface{}) []string
 }
 
 // AgentNames is the list of all supported agent names.
