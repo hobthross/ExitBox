@@ -1,6 +1,7 @@
 package claude
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/cloud-exit/exitbox/internal/config"
@@ -66,5 +67,14 @@ func TestGenerateConfig_Claude(t *testing.T) {
 			t.Error("apiKey should not be set when empty")
 		}
 	})
+}
+
+func TestConfigFilePath_Claude(t *testing.T) {
+	c := &Claude{}
+	got := c.ConfigFilePath("/base")
+	want := filepath.Join("/base", ".claude", "settings.json")
+	if got != want {
+		t.Errorf("ConfigFilePath(/base) = %q, want %q", got, want)
+	}
 }
 

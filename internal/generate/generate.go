@@ -25,6 +25,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/cloud-exit/exitbox/internal/agents"
 )
 
 // ModelInfo describes a model returned by the /models endpoint.
@@ -131,26 +133,14 @@ func WriteConfig(path string, data map[string]interface{}) error {
 	return os.WriteFile(path, out, 0644)
 }
 
-// ConfigPath returns the config file path for an agent within a workspace profile dir.
-func ConfigPath(agentDir, agentName string) string {
-	switch agentName {
-	case "opencode":
-		return filepath.Join(agentDir, ".config", "opencode", "opencode.json")
-	case "claude":
-		return filepath.Join(agentDir, ".claude", "settings.json")
-	case "codex":
-		return filepath.Join(agentDir, ".codex", "config.json")
-	}
-	return ""
-}
-
 // ExtractConfigHosts reads the agent config file and extracts any non-local
 // server hosts (with port) that the agent is configured to connect to.
 func ExtractConfigHosts(agentDir, agentName string) []string {
-	path := ConfigPath(agentDir, agentName)
-	if path == "" {
+	agt := agents.Get(agentName)
+	if agt == nil {
 		return nil
 	}
+	path := agt.ConfigFilePath(agentDir)
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return nil

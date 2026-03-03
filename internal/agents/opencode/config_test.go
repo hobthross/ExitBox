@@ -2,6 +2,7 @@ package opencode
 
 import (
 	"encoding/json"
+	"path/filepath"
 	"testing"
 
 	"github.com/cloud-exit/exitbox/internal/config"
@@ -95,5 +96,14 @@ func TestGenerateConfig_OpenCode(t *testing.T) {
 			t.Errorf("expected compaction.prune=true, got %v", comp["prune"])
 		}
 	})
+}
+
+func TestConfigFilePath_OpenCode(t *testing.T) {
+	o := &OpenCode{}
+	got := o.ConfigFilePath("/base")
+	want := filepath.Join("/base", ".config", "opencode", "opencode.json")
+	if got != want {
+		t.Errorf("ConfigFilePath(/base) = %q, want %q", got, want)
+	}
 }
 

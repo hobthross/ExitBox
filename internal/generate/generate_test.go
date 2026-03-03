@@ -433,24 +433,3 @@ func TestExtractConfigHosts(t *testing.T) {
 		}
 	})
 }
-
-func TestConfigPath(t *testing.T) {
-	tests := []struct {
-		agent    string
-		expected string
-	}{
-		{"opencode", filepath.Join("/base", ".config", "opencode", "opencode.json")},
-		{"claude", filepath.Join("/base", ".claude", "settings.json")},
-		{"codex", filepath.Join("/base", ".codex", "config.json")},
-		{"unknown", ""},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.agent, func(t *testing.T) {
-			got := ConfigPath("/base", tt.agent)
-			if got != tt.expected {
-				t.Errorf("ConfigPath(%q) = %q, want %q", tt.agent, got, tt.expected)
-			}
-		})
-	}
-}

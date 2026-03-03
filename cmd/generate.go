@@ -179,11 +179,7 @@ func runGenerate(agentName, displayName, workspaceFlag string) {
 
 	// Write config.
 	agentDir := profile.WorkspaceAgentDir(workspaceName, agentName)
-	configPath := generate.ConfigPath(agentDir, agentName)
-	if configPath == "" {
-		ui.Errorf("Unknown agent: %s", agentName)
-	}
-
+	configPath := agt.ConfigFilePath(agentDir)
 	if err := generate.WriteConfig(configPath, configData); err != nil {
 		ui.Errorf("Failed to write config: %v", err)
 	}

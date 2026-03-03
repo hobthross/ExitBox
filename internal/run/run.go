@@ -456,10 +456,10 @@ func getEnvOr(key, def string) string {
 }
 
 // ollamaEnvVars returns the container env flags to point an agent at host Ollama.
-func ollamaEnvVars(agent string) []string {
+func ollamaEnvVars(agentName string) []string {
 	const ollamaURL = "http://host.docker.internal:11434"
 
-	a := agents.Get(agent)
+	a := agents.Get(agentName)
 	if a == nil {
 		return nil
 	}
@@ -524,7 +524,7 @@ func isReservedEnvVar(key string) bool {
 		"ANTHROPIC_AUTH_TOKEN":    true,
 		"ANTHROPIC_API_KEY":       true,
 		"OPENAI_BASE_URL":         true,
-		"SSH_AUTH_SOCK":            true,
+		"SSH_AUTH_SOCK":           true,
 	}
 	return reserved[key]
 }
