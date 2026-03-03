@@ -27,6 +27,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cloud-exit/exitbox/internal/agents"
 	"golang.org/x/term"
 )
 
@@ -53,12 +54,6 @@ var (
 	tty          *os.File
 	mu           sync.Mutex
 )
-
-var displayNames = map[string]string{
-	"claude":   "Claude Code",
-	"codex":    "OpenAI Codex",
-	"opencode": "OpenCode",
-}
 
 // barRows is the number of rows reserved for the status bar area.
 const barRows = 2 // text + spacer
@@ -103,10 +98,12 @@ func render(width, height int) {
 		return
 	}
 
-	name := displayNames[curAgent]
-	if name == "" {
-		name = curAgent
+	name := curAgent
+	agt := agents.Get(curAgent)
+	if agt != nil {
+		name = agt.DisplayName()
 	}
+
 	left := fmt.Sprintf(" ExitBox - %s", name)
 	ws := curWorkspace
 	if ws == "" {
