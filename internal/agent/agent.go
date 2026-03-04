@@ -73,6 +73,7 @@ type Agent interface {
 
 type AgentEntity interface {
 	Agent
+	Description() string
 	GenerateConfig(cfg config.ServerConfig) (map[string]interface{}, error)
 	LogLocationProvider
 	PrepareBuildProvider

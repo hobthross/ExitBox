@@ -21,6 +21,7 @@ var _ agent.AgentEntity = (*Claude)(nil)
 
 func (c *Claude) Name() string        { return "claude" }
 func (c *Claude) DisplayName() string { return "Claude Code" }
+func (c *Claude) Description() string { return "Anthropic's AI coding assistant" }
 
 func (c *Claude) OllamaEnvVars(ollamaBaseURL string) []string {
 	return []string{

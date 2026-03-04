@@ -18,6 +18,7 @@ var _ agent.AgentEntity = (*OpenCode)(nil)
 
 func (o *OpenCode) Name() string        { return "opencode" }
 func (o *OpenCode) DisplayName() string { return "OpenCode" }
+func (o *OpenCode) Description() string { return "Open-source AI code assistant" }
 
 func (o *OpenCode) OllamaEnvVars(ollamaBaseURL string) []string {
 	return []string{

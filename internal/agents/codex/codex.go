@@ -18,6 +18,7 @@ var _ agent.AgentEntity = (*Codex)(nil)
 
 func (c *Codex) Name() string        { return "codex" }
 func (c *Codex) DisplayName() string { return "OpenAI Codex" }
+func (c *Codex) Description() string { return "OpenAI's coding CLI" }
 
 func (c *Codex) OllamaEnvVars(ollamaBaseURL string) []string {
 	return []string{
