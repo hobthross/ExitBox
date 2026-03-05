@@ -17,7 +17,7 @@
 package cmd
 
 import (
-	"github.com/cloud-exit/exitbox/internal/agent"
+	"github.com/cloud-exit/exitbox/internal/agents"
 	"github.com/cloud-exit/exitbox/internal/config"
 	"github.com/cloud-exit/exitbox/internal/ui"
 	"github.com/spf13/cobra"
@@ -29,7 +29,8 @@ var enableCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		name := args[0]
-		if !agent.IsValidAgent(name) {
+		agt := agents.Get(name)
+		if agt == nil {
 			ui.Errorf("Unknown agent: %s", name)
 		}
 
@@ -44,7 +45,7 @@ var enableCmd = &cobra.Command{
 			ui.Errorf("Failed to save config: %v", err)
 		}
 
-		ui.Successf("%s enabled", agent.DisplayName(name))
+		ui.Successf("%s enabled", agt.DisplayName())
 		ui.Infof("Run 'exitbox run %s' to start using it", name)
 	},
 }

@@ -21,7 +21,7 @@ import (
 	"io/fs"
 	"path/filepath"
 
-	"github.com/cloud-exit/exitbox/internal/agent"
+	"github.com/cloud-exit/exitbox/internal/agents"
 	"github.com/cloud-exit/exitbox/internal/config"
 	"github.com/cloud-exit/exitbox/internal/container"
 	"github.com/cloud-exit/exitbox/internal/platform"
@@ -67,9 +67,9 @@ var infoCmd = &cobra.Command{
 		fmt.Println()
 
 		found := false
-		for _, name := range agent.AgentNames {
-			if rt != nil && rt.ImageExists("exitbox-"+name+"-core") {
-				fmt.Printf("  • %s (%s)\n", agent.DisplayName(name), name)
+		for _, agt := range agents.All() {
+			if rt != nil && rt.ImageExists("exitbox-"+agt.Name()+"-core") {
+				fmt.Printf("  • %s (%s)\n", agt.DisplayName(), agt.Name())
 				found = true
 			}
 		}

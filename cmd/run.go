@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/cloud-exit/exitbox/internal/agent"
+	"github.com/cloud-exit/exitbox/internal/agents"
 	"github.com/cloud-exit/exitbox/internal/config"
 	"github.com/cloud-exit/exitbox/internal/container"
 	"github.com/cloud-exit/exitbox/internal/image"
@@ -89,15 +90,18 @@ Examples:
   exitbox run opencode --ollama --memory 16g --cpus 8`,
 }
 
-func newAgentRunCmd(agentName string) *cobra.Command {
-	display := agent.DisplayName(agentName)
+func newAgentRunCmd(agt agent.AgentEntity) *cobra.Command {
+	if agt == nil {
+		return nil
+	}
+	display := agt.DisplayName()
 	return &cobra.Command{
-		Use:                agentName + " [args...]",
+		Use:                agt.Name() + " [args...]",
 		Short:              "Run " + display,
 		Long:               "Run " + display + " in an isolated container.",
 		DisableFlagParsing: true,
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			return completeAgentRunArgs(agentName, args, toComplete)
+			return completeAgentRunArgs(agt.Name(), args, toComplete)
 		},
 		Run: func(cmd *cobra.Command, args []string) {
 			// DisableFlagParsing swallows --help; handle it manually
@@ -113,7 +117,7 @@ func newAgentRunCmd(agentName string) *cobra.Command {
 					break
 				}
 			}
-			runAgent(agentName, args)
+			runAgent(agt.Name(), args)
 		},
 	}
 }
@@ -331,16 +335,16 @@ type parsedFlags struct {
 	SessionName    string
 	SessionNameSet bool // true when --name was explicitly passed
 	Verbose        bool
-	ForceUpdate bool
-	Workspace   string
-	Ollama      bool
-	Memory      string
-	CPUs        string
-	EnvVars     []string
-	IncludeDirs []string
-	AllowURLs   []string
-	Tools       []string
-	Remaining   []string
+	ForceUpdate    bool
+	Workspace      string
+	Ollama         bool
+	Memory         string
+	CPUs           string
+	EnvVars        []string
+	IncludeDirs    []string
+	AllowURLs      []string
+	Tools          []string
+	Remaining      []string
 }
 
 func parseRunFlags(passthrough []string, defaults config.DefaultFlags) parsedFlags {
@@ -478,8 +482,8 @@ func parseSessionAction(raw string) sessionAction {
 }
 
 func init() {
-	for _, name := range agent.AgentNames {
-		agentCmd := newAgentRunCmd(name)
+	for _, agt := range agents.All() {
+		agentCmd := newAgentRunCmd(agt)
 		runCmd.AddCommand(agentCmd)
 	}
 

@@ -20,7 +20,7 @@ import (
 	"context"
 	"os"
 
-	"github.com/cloud-exit/exitbox/internal/agent"
+	"github.com/cloud-exit/exitbox/internal/agents"
 	"github.com/cloud-exit/exitbox/internal/config"
 	"github.com/cloud-exit/exitbox/internal/container"
 	"github.com/cloud-exit/exitbox/internal/image"
@@ -45,36 +45,43 @@ var rebuildCmd = &cobra.Command{
 		image.Version = Version
 		image.AutoUpdate = true // rebuild always checks for latest
 
-		var agents []string
+		var agentNames []string
 		if name == "all" {
 			cfg := config.LoadOrDefault()
-			for _, a := range agent.AgentNames {
-				if cfg.IsAgentEnabled(a) {
-					agents = append(agents, a)
+			for _, a := range agents.All() {
+				if cfg.IsAgentEnabled(a.Name()) {
+					agentNames = append(agentNames, a.Name())
 				}
 			}
-			if len(agents) == 0 {
+			if len(agentNames) == 0 {
 				ui.Error("No agents are enabled. Run 'exitbox setup' first.")
 			}
 		} else {
-			if !agent.IsValidAgent(name) {
+			agt := agents.Get(name)
+			if agt == nil {
 				ui.Errorf("Unknown agent: %s", name)
 			}
-			agents = []string{name}
+			agentNames = []string{agt.Name()}
 		}
 
 		projectDir, _ := os.Getwd()
 		ctx := context.Background()
 
-		for _, a := range agents {
-			ui.Infof("Rebuilding %s container image...", agent.DisplayName(a))
-			if err := image.BuildCore(ctx, rt, a, true); err != nil {
-				ui.Errorf("Failed to rebuild %s core image: %v", agent.DisplayName(a), err)
+		for _, agentName := range agentNames {
+			agt := agents.Get(agentName)
+			if agt == nil {
+				ui.Errorf("Unknown agent: %s", agentName)
+				continue
 			}
-			if err := image.BuildProject(ctx, rt, a, projectDir, rebuildWorkspace, true); err != nil {
-				ui.Errorf("Failed to rebuild %s project image: %v", agent.DisplayName(a), err)
+
+			ui.Infof("Rebuilding %s container image...", agt.DisplayName())
+			if err := image.BuildCore(ctx, rt, agentName, true); err != nil {
+				ui.Errorf("Failed to rebuild %s core image: %v", agt.DisplayName(), err)
 			}
-			ui.Successf("%s image rebuilt successfully", agent.DisplayName(a))
+			if err := image.BuildProject(ctx, rt, agentName, projectDir, rebuildWorkspace, true); err != nil {
+				ui.Errorf("Failed to rebuild %s project image: %v", agt.DisplayName(), err)
+			}
+			ui.Successf("%s image rebuilt successfully", agt.DisplayName())
 		}
 	},
 }

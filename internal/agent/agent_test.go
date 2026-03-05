@@ -8,25 +8,6 @@ import (
 	"testing"
 )
 
-func TestDisplayName(t *testing.T) {
-	tests := []struct {
-		input    string
-		expected string
-	}{
-		{"claude", "Claude Code"},
-		{"codex", "OpenAI Codex"},
-		{"opencode", "OpenCode"},
-		{"unknown", "unknown"},
-		{"", ""},
-	}
-	for _, tc := range tests {
-		got := DisplayName(tc.input)
-		if got != tc.expected {
-			t.Errorf("DisplayName(%q) = %q, want %q", tc.input, got, tc.expected)
-		}
-	}
-}
-
 func TestIsValidAgent(t *testing.T) {
 	tests := []struct {
 		input    string

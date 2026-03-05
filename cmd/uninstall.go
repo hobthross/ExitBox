@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/cloud-exit/exitbox/internal/agent"
+	"github.com/cloud-exit/exitbox/internal/agents"
 	"github.com/cloud-exit/exitbox/internal/config"
 	"github.com/cloud-exit/exitbox/internal/container"
 	"github.com/cloud-exit/exitbox/internal/ui"
@@ -95,11 +96,12 @@ var uninstallCmd = &cobra.Command{
 
 		// Single agent uninstall
 		name := args[0]
-		if !agent.IsValidAgent(name) {
+		agt := agents.Get(name)
+		if agt == nil {
 			ui.Errorf("Unknown agent: %s", name)
 		}
 
-		fmt.Printf("This will remove all %s images and configuration.\n", agent.DisplayName(name))
+		fmt.Printf("This will remove all %s images and configuration.\n", agt.DisplayName())
 		fmt.Print("Are you sure? [y/N] ")
 
 		reader := bufio.NewReader(os.Stdin)
@@ -128,7 +130,7 @@ var uninstallCmd = &cobra.Command{
 			ui.Warnf("Failed to save config: %v", saveErr)
 		}
 
-		ui.Successf("%s completely uninstalled", agent.DisplayName(name))
+		ui.Successf("%s completely uninstalled", agt.DisplayName())
 	},
 }
 
