@@ -29,22 +29,6 @@ type Mount struct {
 	Target string
 }
 
-type LogLocationProvider interface {
-	LogSearchDirs(home, agentCfgDir string) []string
-}
-
-type PrepareBuildProvider interface {
-	// PrepareBuild prepares the build context (downloads binaries, writes Dockerfile) for the agent's core image.
-	PrepareBuild(in PrepareBuildInput) error
-}
-
-// WorkspaceConfigEnsurer ensures workspace-specific agent config directories exist
-// and seeds them from host config when empty.
-type WorkspaceConfigEnsurer interface {
-	// EnsureWorkspaceAgentConfig creates and seeds agent config dirs for the given workspace.
-	EnsureWorkspaceAgentConfig(workspaceName string) error
-}
-
 // PrepareBuildInput holds parameters for preparing an agent's Docker build context.
 // It is passed to Agent.PrepareBuild to support download, checksum, and logging.
 type PrepareBuildInput struct {
@@ -57,27 +41,31 @@ type PrepareBuildInput struct {
 	Logf           func(format string, args ...interface{})
 }
 
-// Agent is the interface that all agent implementations must satisfy.
 type Agent interface {
 	Name() string
 	DisplayName() string
+	Description() string
+
 	GetLatestVersion() (string, error)
 	GetInstalledVersion(rt container.Runtime, img string) (string, error)
+
 	GetDockerfileInstall(buildCtx string) (string, error)
 	GetFullDockerfile(version string) (string, error)
+
 	HostConfigPaths() []string
 	ContainerMounts(cfgDir string) []Mount
 	DetectHostConfig() (string, error)
 	ImportConfig(src, dst string) error
-}
 
-type AgentEntity interface {
-	Agent
-	Description() string
 	GenerateConfig(cfg config.ServerConfig) (map[string]interface{}, error)
-	LogLocationProvider
-	PrepareBuildProvider
-	WorkspaceConfigEnsurer
+	LogSearchDirs(home, agentCfgDir string) []string
+
+	// PrepareBuild prepares the build context (downloads binaries, writes Dockerfile) for the agent's core image.
+	PrepareBuild(in PrepareBuildInput) error
+
+	// EnsureWorkspaceAgentConfig creates and seeds agent config dirs for the given workspace.
+	EnsureWorkspaceAgentConfig(workspaceName string) error
+
 	OllamaEnvVars(ollamaBaseURL string) []string
 	ConfigFilePath(agentDir string) string
 	// ExtractConfigServerURLs returns server URLs from parsed agent config JSON.

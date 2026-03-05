@@ -14,7 +14,7 @@ import (
 
 type OpenCode struct{}
 
-var _ agent.AgentEntity = (*OpenCode)(nil)
+var _ agent.Agent = (*OpenCode)(nil)
 
 func (o *OpenCode) Name() string        { return "opencode" }
 func (o *OpenCode) DisplayName() string { return "OpenCode" }

@@ -7,12 +7,12 @@ import (
 	"github.com/cloud-exit/exitbox/internal/agents/opencode"
 )
 
-func Get(name string) agent.AgentEntity {
+func Get(name string) agent.Agent {
 	return registry[name]
 }
 
-func All() []agent.AgentEntity {
-	result := make([]agent.AgentEntity, 0, len(registry))
+func All() []agent.Agent {
+	result := make([]agent.Agent, 0, len(registry))
 	for _, a := range registry {
 		result = append(result, a)
 	}
@@ -31,10 +31,10 @@ func Names(prefix ...string) []string {
 }
 
 // registry holds all agent implementations.
-var registry = map[string]agent.AgentEntity{}
+var registry = map[string]agent.Agent{}
 
 // Register adds an agent to the registry.
-func Register(a agent.AgentEntity) {
+func Register(a agent.Agent) {
 	registry[a.Name()] = a
 }
 

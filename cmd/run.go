@@ -90,7 +90,7 @@ Examples:
   exitbox run opencode --ollama --memory 16g --cpus 8`,
 }
 
-func newAgentRunCmd(agt agent.AgentEntity) *cobra.Command {
+func newAgentRunCmd(agt agent.Agent) *cobra.Command {
 	if agt == nil {
 		return nil
 	}

@@ -17,7 +17,7 @@ const (
 
 type Claude struct{}
 
-var _ agent.AgentEntity = (*Claude)(nil)
+var _ agent.Agent = (*Claude)(nil)
 
 func (c *Claude) Name() string        { return "claude" }
 func (c *Claude) DisplayName() string { return "Claude Code" }
