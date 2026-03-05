@@ -1,0 +1,109 @@
+package codex
+
+import (
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"testing"
+)
+
+func TestCodexAgent(t *testing.T) {
+	c := &Codex{}
+
+	if c.Name() != "codex" {
+		t.Errorf("Name() = %q, want %q", c.Name(), "codex")
+	}
+	if c.DisplayName() != "OpenAI Codex" {
+		t.Errorf("DisplayName() = %q, want %q", c.DisplayName(), "OpenAI Codex")
+	}
+
+	// BinaryName
+	bn := c.BinaryName()
+	switch runtime.GOARCH {
+	case "amd64":
+		if bn != "codex-x86_64-unknown-linux-musl.tar.gz" {
+			t.Errorf("BinaryName() = %q on amd64", bn)
+		}
+	case "arm64":
+		if bn != "codex-aarch64-unknown-linux-musl.tar.gz" {
+			t.Errorf("BinaryName() = %q on arm64", bn)
+		}
+	}
+
+	// HostConfigPaths
+	paths := c.HostConfigPaths()
+	if len(paths) != 2 {
+		t.Fatalf("HostConfigPaths() returned %d paths, want 2", len(paths))
+	}
+
+	// ContainerMounts
+	mounts := c.ContainerMounts("/cfg")
+	if len(mounts) != 2 {
+		t.Fatalf("ContainerMounts() returned %d mounts, want 2", len(mounts))
+	}
+	if mounts[0].Target != "/home/user/.codex" {
+		t.Errorf("mounts[0].Target = %q, want /home/user/.codex", mounts[0].Target)
+	}
+
+	// GetDockerfileInstall
+	df, err := c.GetDockerfileInstall("")
+	if err != nil {
+		t.Fatalf("GetDockerfileInstall() error: %v", err)
+	}
+	if !strings.Contains(df, "sha256sum") {
+		t.Error("GetDockerfileInstall() should contain sha256sum verification")
+	}
+
+	// GetFullDockerfile
+	full, err := c.GetFullDockerfile("v0.1.0")
+	if err != nil {
+		t.Fatalf("GetFullDockerfile() error: %v", err)
+	}
+	if !strings.HasPrefix(full, "FROM exitbox-base") {
+		t.Error("GetFullDockerfile() should start with FROM exitbox-base")
+	}
+	if !strings.Contains(full, "CODEX_VERSION=v0.1.0") {
+		t.Error("GetFullDockerfile() should include CODEX_VERSION ARG")
+	}
+}
+
+func TestCodexGetInstalledVersion_NilRuntime(t *testing.T) {
+	c := &Codex{}
+	if _, err := c.GetInstalledVersion(nil, "some-image"); err == nil {
+		t.Errorf("GetInstalledVersion(nil, ...) should return error")
+	}
+}
+
+func TestCodexImportConfig_DefaultDir(t *testing.T) {
+	src := t.TempDir()
+	dst := t.TempDir()
+	_ = os.WriteFile(filepath.Join(src, "config.json"), []byte(`{}`), 0644)
+
+	c := &Codex{}
+	if err := c.ImportConfig(src, dst); err != nil {
+		t.Fatalf("ImportConfig() error: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(dst, ".codex", "config.json")); err != nil {
+		t.Errorf("expected .codex/config.json to exist: %v", err)
+	}
+}
+
+func TestCodexImportConfig_ConfigDir(t *testing.T) {
+	src := filepath.Join(t.TempDir(), ".config", "codex")
+	dst := t.TempDir()
+	_ = os.MkdirAll(src, 0755)
+	_ = os.WriteFile(filepath.Join(src, "config.json"), []byte(`{}`), 0644)
+
+	c := &Codex{}
+	if err := c.ImportConfig(src, dst); err != nil {
+		t.Fatalf("ImportConfig() error: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(dst, ".config", "codex", "config.json")); err != nil {
+		t.Errorf("expected .config/codex/config.json to exist: %v", err)
+	}
+}
+
+

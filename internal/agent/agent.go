@@ -83,35 +83,3 @@ type AgentEntity interface {
 	// ExtractConfigServerURLs returns server URLs from parsed agent config JSON.
 	ExtractConfigServerURLs(data map[string]interface{}) []string
 }
-
-// AgentNames is the list of all supported agent names.
-var AgentNames = []string{"claude", "codex", "opencode"}
-
-// IsValidAgent returns true if the name is a known agent.
-func IsValidAgent(name string) bool {
-	for _, a := range AgentNames {
-		if a == name {
-			return true
-		}
-	}
-	return false
-}
-
-// registry holds all agent implementations.
-var registry = map[string]Agent{}
-
-// Register adds an agent to the registry.
-func Register(a Agent) {
-	registry[a.Name()] = a
-}
-
-// Get returns the agent implementation for a name.
-func Get(name string) Agent {
-	return registry[name]
-}
-
-func init() {
-	Register(&Claude{})
-	Register(&Codex{})
-	Register(&OpenCode{})
-}
