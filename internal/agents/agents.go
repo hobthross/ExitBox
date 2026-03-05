@@ -5,6 +5,7 @@ import (
 	"github.com/cloud-exit/exitbox/internal/agents/claude"
 	"github.com/cloud-exit/exitbox/internal/agents/codex"
 	"github.com/cloud-exit/exitbox/internal/agents/opencode"
+	"github.com/cloud-exit/exitbox/internal/agents/qwen"
 )
 
 func Get(name string) agent.Agent {
@@ -42,4 +43,5 @@ func init() {
 	Register(&claude.Claude{})
 	Register(&codex.Codex{})
 	Register(&opencode.OpenCode{})
+	Register(&qwen.Qwen{})
 }
