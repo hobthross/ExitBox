@@ -22,7 +22,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/cloud-exit/exitbox/internal/agent"
 	"github.com/cloud-exit/exitbox/internal/agents"
 	"github.com/cloud-exit/exitbox/internal/config"
 	"github.com/cloud-exit/exitbox/internal/container"
@@ -79,7 +78,7 @@ var uninstallCmd = &cobra.Command{
 
 			// Remove config
 			cfg := config.LoadOrDefault()
-			for _, name := range agent.AgentNames {
+			for _, name := range agents.Names() {
 				cfg.SetAgentEnabled(name, false)
 				_ = os.RemoveAll(config.AgentDir(name))
 			}

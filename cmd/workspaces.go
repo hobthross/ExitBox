@@ -22,7 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/cloud-exit/exitbox/internal/agent"
+	"github.com/cloud-exit/exitbox/internal/agents"
 	"github.com/cloud-exit/exitbox/internal/config"
 	"github.com/cloud-exit/exitbox/internal/profile"
 	"github.com/cloud-exit/exitbox/internal/ui"
@@ -168,7 +168,7 @@ func newWorkspacesAddCmd() *cobra.Command {
 				handleCredentialSetup(w.Name, result.CopyFrom)
 			} else {
 				// Seed from host config if no copy source.
-				for _, a := range agent.AgentNames {
+				for _, a := range agents.Names() {
 					if !cfg.IsAgentEnabled(a) {
 						continue
 					}
