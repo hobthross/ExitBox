@@ -20,7 +20,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/cloud-exit/exitbox/internal/agent"
+	"github.com/cloud-exit/exitbox/internal/agents"
 	"github.com/cloud-exit/exitbox/internal/config"
 	"github.com/cloud-exit/exitbox/internal/profile"
 	"github.com/cloud-exit/exitbox/internal/ui"
@@ -47,14 +47,15 @@ Examples:
 		Run: func(cmd *cobra.Command, args []string) {
 			target := args[0]
 
-			var agents []string
+			var agentNames []string
 			if target == "all" {
-				agents = agent.AgentNames
+				agentNames = agents.Names()
 			} else {
-				if !agent.IsValidAgent(target) {
+				agt := agents.Get(target)
+				if agt == nil {
 					ui.Errorf("Unknown agent: %s", target)
 				}
-				agents = []string{target}
+				agentNames = []string{target}
 			}
 
 			// Resolve target workspace.
@@ -62,8 +63,8 @@ Examples:
 			workspaceName := resolveImportWorkspace(cfg, workspace)
 
 			importedAny := false
-			for _, name := range agents {
-				a := agent.Get(name)
+			for _, name := range agentNames {
+				a := agents.Get(name)
 				if a == nil {
 					continue
 				}
