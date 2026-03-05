@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/cloud-exit/exitbox/internal/agent"
+	"github.com/cloud-exit/exitbox/internal/agents"
 	"github.com/cloud-exit/exitbox/internal/config"
 	"github.com/cloud-exit/exitbox/internal/profile"
 	"github.com/cloud-exit/exitbox/internal/ui"
@@ -118,29 +118,25 @@ func runSetup() error {
 func handleCredentialSetup(workspaceName, copyFrom string) {
 	if copyFrom == "__host__" {
 		// Import from host config.
-		for _, name := range agent.AgentNames {
-			a := agent.Get(name)
-			if a == nil {
-				continue
-			}
+		for _, a := range agents.All() {
 			src, err := a.DetectHostConfig()
 			if err != nil {
 				continue
 			}
-			dst := profile.WorkspaceAgentDir(workspaceName, name)
+			dst := profile.WorkspaceAgentDir(workspaceName, a.Name())
 			if err := os.MkdirAll(dst, 0755); err != nil {
-				ui.Warnf("Failed to create workspace dir for %s: %v", name, err)
+				ui.Warnf("Failed to create workspace dir for %s: %v", a.Name(), err)
 				continue
 			}
 			if err := a.ImportConfig(src, dst); err != nil {
-				ui.Warnf("Failed to import %s config: %v", name, err)
+				ui.Warnf("Failed to import %s config: %v", a.Name(), err)
 				continue
 			}
-			ui.Successf("Imported %s credentials from host", name)
+			ui.Successf("Imported %s credentials from host", a.Name())
 		}
 	} else {
 		// Copy from another workspace.
-		if err := profile.CopyWorkspaceCredentials(copyFrom, workspaceName, agent.AgentNames); err != nil {
+		if err := profile.CopyWorkspaceCredentials(copyFrom, workspaceName, agents.Names()); err != nil {
 			ui.Warnf("Failed to copy credentials from '%s': %v", copyFrom, err)
 		} else {
 			ui.Successf("Copied credentials from workspace '%s'", copyFrom)
