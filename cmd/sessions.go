@@ -22,7 +22,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/cloud-exit/exitbox/internal/agent"
 	"github.com/cloud-exit/exitbox/internal/agents"
 	"github.com/cloud-exit/exitbox/internal/config"
 	"github.com/cloud-exit/exitbox/internal/profile"
@@ -206,9 +205,11 @@ func resolveSessionsWorkspace(cfg *config.Config, projectDir, workspaceOverride 
 func resolveSessionAgents(filter string) ([]string, error) {
 	filter = strings.TrimSpace(filter)
 	if filter == "" || filter == "all" {
-		return agent.AgentNames, nil
+		return agents.Names(), nil
 	}
-	if !agent.IsValidAgent(filter) {
+
+	agt := agents.Get(filter)
+	if agt == nil {
 		return nil, fmt.Errorf("unknown agent '%s'. Expected one of: claude, codex, opencode, all", filter)
 	}
 	return []string{filter}, nil
