@@ -94,7 +94,7 @@ func newSessionsListCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&workspaceOverride, "workspace", "w", "", "Workspace to inspect (defaults to resolved active workspace)")
-	cmd.Flags().StringVar(&agentFilter, "agent", "all", "Agent filter: claude|codex|opencode|all")
+	cmd.Flags().StringVar(&agentFilter, "agent", "all", "Agent filter: claude|codex|opencode|qwen|all")
 	_ = cmd.RegisterFlagCompletionFunc("workspace", completeWorkspaceFlagValues)
 	_ = cmd.RegisterFlagCompletionFunc("agent", func(_ *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		candidates := agents.Names("all")

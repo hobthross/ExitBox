@@ -78,28 +78,28 @@ type State struct {
 
 // Model is the root bubbletea model for the wizard.
 type Model struct {
-	step           Step
-	state          State
-	cursor         int
-	checked        map[string]bool
-	workspaceInput string
-	workspaceOnly  bool
+	step             Step
+	state            State
+	cursor           int
+	checked          map[string]bool
+	workspaceInput   string
+	workspaceOnly    bool
 	workspaces       []config.Workspace // populated when >1 workspace exists
 	defaultWorkspace string             // the config's default workspace name
 	editingExisting  bool               // true when editing an existing workspace (skip role→lang override)
-	width          int
-	height         int
-	cancelled      bool
-	confirmed      bool
+	width            int
+	height           int
+	cancelled        bool
+	confirmed        bool
 
 	// Package search step fields
-	pkgSearchInput string            // current search text
-	pkgSearchMode  bool              // true = typing in search, false = browsing results
-	pkgResults     []apk.Package     // current search results (max 50)
-	pkgSelected    map[string]bool   // selected custom packages (persists across searches)
-	pkgIndex       []apk.Package     // full in-memory index (loaded once)
-	pkgLoading     bool              // true while fetching index
-	pkgLoadErr     string            // error message if fetch failed
+	pkgSearchInput string          // current search text
+	pkgSearchMode  bool            // true = typing in search, false = browsing results
+	pkgResults     []apk.Package   // current search results (max 50)
+	pkgSelected    map[string]bool // selected custom packages (persists across searches)
+	pkgIndex       []apk.Package   // full in-memory index (loaded once)
+	pkgLoading     bool            // true while fetching index
+	pkgLoadErr     string          // error message if fetch failed
 
 	// Sidebar navigation
 	sidebarFocused bool
@@ -119,11 +119,11 @@ type Model struct {
 	topMenuChoice int // -1=not chosen, 0=workspace, 1=settings
 
 	// Keybindings step
-	keybindings   map[string]string // current keybinding values
-	kbCursor      int               // highlighted action index
-	kbEditMode    bool              // true when editing a binding
-	kbEditInput   string            // current text input for tmux notation
-	kbEditErr     string            // validation error message
+	keybindings map[string]string // current keybinding values
+	kbCursor    int               // highlighted action index
+	kbEditMode  bool              // true when editing a binding
+	kbEditInput string            // current text input for tmux notation
+	kbEditErr   string            // validation error message
 
 	// Vault step: 0=choice, 1=password, 2=confirm
 	vaultPhase     int
@@ -243,6 +243,9 @@ func NewModelFromConfig(cfg *config.Config) Model {
 	}
 	if cfg.Agents.OpenCode.Enabled {
 		checked["agent:opencode"] = true
+	}
+	if cfg.Agents.Qwen.Enabled {
+		checked["agent:qwen"] = true
 	}
 
 	// Pre-check tool categories from saved selections (or fall back to role inference)

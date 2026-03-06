@@ -28,6 +28,7 @@ func EnsureDirs() {
 		AgentDir("claude"),
 		AgentDir("codex"),
 		AgentDir("opencode"),
+		AgentDir("qwen"),
 	}
 	for _, d := range dirs {
 		_ = os.MkdirAll(d, 0755)
