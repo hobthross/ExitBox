@@ -78,7 +78,7 @@ func (c *Claude) ImportConfig(src, dst string) error {
 	// Copy entire ~/.claude directory
 	target := filepath.Join(dst, ".claude")
 	_ = os.MkdirAll(target, 0755)
-	if err := agent.CopyDir(src, target); err != nil {
+	if err := fsutil.CopyDir(src, target); err != nil {
 		return fmt.Errorf("copying .claude dir: %w", err)
 	}
 

@@ -87,9 +87,9 @@ func (c *Codex) ImportConfig(src, dst string) error {
 	if strings.Contains(src, filepath.Join(".config", "codex")) {
 		target := filepath.Join(dst, ".config", "codex")
 		_ = os.MkdirAll(target, 0755)
-		return agent.CopyDir(src, target)
+		return fsutil.CopyDir(src, target)
 	}
 	target := filepath.Join(dst, ".codex")
 	_ = os.MkdirAll(target, 0755)
-	return agent.CopyDir(src, target)
+	return fsutil.CopyDir(src, target)
 }

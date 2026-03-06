@@ -97,9 +97,9 @@ func (o *OpenCode) ImportConfig(src, dst string) error {
 	if strings.Contains(src, filepath.Join(".config", "opencode")) {
 		target := filepath.Join(dst, ".config", "opencode")
 		_ = os.MkdirAll(target, 0755)
-		return agent.CopyDir(src, target)
+		return fsutil.CopyDir(src, target)
 	}
 	target := filepath.Join(dst, ".opencode")
 	_ = os.MkdirAll(target, 0755)
-	return agent.CopyDir(src, target)
+	return fsutil.CopyDir(src, target)
 }
