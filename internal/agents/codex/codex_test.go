@@ -75,6 +75,41 @@ func TestCodexGetInstalledVersion_NilRuntime(t *testing.T) {
 	}
 }
 
+func TestCodexImportFile(t *testing.T) {
+	srcDir := t.TempDir()
+	dstDir := t.TempDir()
+
+	srcFile := filepath.Join(srcDir, "config.toml")
+	content := []byte("[model]\nprovider = \"custom\"\n")
+	if err := os.WriteFile(srcFile, content, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	c := &Codex{}
+	if err := c.ImportFile(srcFile, dstDir); err != nil {
+		t.Fatalf("ImportFile failed: %v", err)
+	}
+
+	target := filepath.Join(dstDir, ".codex", "config.toml")
+	data, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatalf("expected file at %s: %v", target, err)
+	}
+	if string(data) != string(content) {
+		t.Errorf("content mismatch: got %q, want %q", data, content)
+	}
+}
+
+func TestCodexImportFile_NonexistentSource(t *testing.T) {
+	dstDir := t.TempDir()
+
+	c := &Codex{}
+	err := c.ImportFile("/nonexistent/file.toml", dstDir)
+	if err == nil {
+		t.Fatal("expected error for nonexistent source file")
+	}
+}
+
 func TestCodexImportConfig_DefaultDir(t *testing.T) {
 	src := t.TempDir()
 	dst := t.TempDir()

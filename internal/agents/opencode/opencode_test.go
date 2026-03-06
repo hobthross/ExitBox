@@ -106,4 +106,28 @@ func TestOpenCodeImportConfig_ConfigDir(t *testing.T) {
 	}
 }
 
+func TestOpenCodeImportFile(t *testing.T) {
+	srcDir := t.TempDir()
+	dstDir := t.TempDir()
+
+	srcFile := filepath.Join(srcDir, "opencode.json")
+	content := []byte(`{"provider": "anthropic"}`)
+	if err := os.WriteFile(srcFile, content, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	o := &OpenCode{}
+	if err := o.ImportFile(srcFile, dstDir); err != nil {
+		t.Fatalf("ImportFile failed: %v", err)
+	}
+
+	target := filepath.Join(dstDir, ".config", "opencode", "opencode.json")
+	data, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatalf("expected file at %s: %v", target, err)
+	}
+	if string(data) != string(content) {
+		t.Errorf("content mismatch: got %q, want %q", data, content)
+	}
+}
 

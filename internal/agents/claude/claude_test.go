@@ -89,4 +89,29 @@ func TestClaudeImportConfig(t *testing.T) {
 	}
 }
 
+func TestClaudeImportFile(t *testing.T) {
+	srcDir := t.TempDir()
+	dstDir := t.TempDir()
+
+	srcFile := filepath.Join(srcDir, "settings.json")
+	content := []byte(`{"theme": "dark"}`)
+	if err := os.WriteFile(srcFile, content, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	c := &Claude{}
+	if err := c.ImportFile(srcFile, dstDir); err != nil {
+		t.Fatalf("ImportFile failed: %v", err)
+	}
+
+	target := filepath.Join(dstDir, ".claude", "settings.json")
+	data, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatalf("expected file at %s: %v", target, err)
+	}
+	if string(data) != string(content) {
+		t.Errorf("content mismatch: got %q, want %q", data, content)
+	}
+}
+
 

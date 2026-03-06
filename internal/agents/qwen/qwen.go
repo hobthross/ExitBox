@@ -99,3 +99,15 @@ func (q *Qwen) ImportConfig(src, dst string) error {
 	_ = os.MkdirAll(target, 0755)
 	return fsutil.CopyDir(src, target)
 }
+
+func (q *Qwen) ImportFile(src, dst string) error {
+	target := filepath.Join(dst, ".qwen", filepath.Base(src))
+	if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+		return err
+	}
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(target, data, 0644)
+}

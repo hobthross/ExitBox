@@ -103,3 +103,15 @@ func (o *OpenCode) ImportConfig(src, dst string) error {
 	_ = os.MkdirAll(target, 0755)
 	return fsutil.CopyDir(src, target)
 }
+
+func (o *OpenCode) ImportFile(src, dst string) error {
+	target := filepath.Join(dst, ".config", "opencode", filepath.Base(src))
+	if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+		return err
+	}
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(target, data, 0644)
+}
