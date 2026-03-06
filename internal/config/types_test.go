@@ -115,6 +115,57 @@ func TestSetAgentEnabled(t *testing.T) {
 	cfg.SetAgentEnabled("unknown", true)
 }
 
+func TestGetAgentVersion(t *testing.T) {
+	cfg := &Config{
+		Agents: AgentConfig{
+			Claude:   AgentEntry{Enabled: true, Version: "1.0.123"},
+			Codex:    AgentEntry{Enabled: true},
+			OpenCode: AgentEntry{Enabled: true, Version: "0.5.0"},
+		},
+	}
+
+	tests := []struct {
+		name     string
+		expected string
+	}{
+		{"claude", "1.0.123"},
+		{"codex", ""},
+		{"opencode", "0.5.0"},
+		{"unknown", ""},
+		{"", ""},
+	}
+	for _, tc := range tests {
+		got := cfg.GetAgentVersion(tc.name)
+		if got != tc.expected {
+			t.Errorf("GetAgentVersion(%q) = %q, want %q", tc.name, got, tc.expected)
+		}
+	}
+}
+
+func TestAgentEntry_VersionYAML(t *testing.T) {
+	input := "enabled: true\nversion: 1.0.123\n"
+	var entry AgentEntry
+	if err := yaml.Unmarshal([]byte(input), &entry); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	if !entry.Enabled {
+		t.Error("expected Enabled=true")
+	}
+	if entry.Version != "1.0.123" {
+		t.Errorf("expected Version=1.0.123, got %q", entry.Version)
+	}
+
+	// Version omitted when empty
+	entry2 := AgentEntry{Enabled: true}
+	data, err := yaml.Marshal(entry2)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	if string(data) != "enabled: true\n" {
+		t.Errorf("expected no version field, got %q", string(data))
+	}
+}
+
 func TestDefaultConfig_Values(t *testing.T) {
 	cfg := DefaultConfig()
 

@@ -86,7 +86,12 @@ func main() {
 func requestAllow(socketPath, domain string) (bool, error) {
 	conn, err := net.Dial("unix", socketPath)
 	if err != nil {
-		return false, fmt.Errorf("IPC socket not available. Domain allow requests require firewall mode")
+		// Distinguish "socket missing" from "socket exists but connect denied"
+		// to help diagnose stale bind-mount scenarios.
+		if _, statErr := os.Stat(socketPath); statErr == nil {
+			return false, fmt.Errorf("IPC socket exists but connect failed (%v). The host exitbox process may have exited while this container is still running", err)
+		}
+		return false, fmt.Errorf("IPC socket not available (%v). Domain allow requests require firewall mode", err)
 	}
 	defer conn.Close()
 

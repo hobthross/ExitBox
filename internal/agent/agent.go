@@ -70,4 +70,6 @@ type Agent interface {
 	ConfigFilePath(agentDir string) string
 	// ExtractConfigServerURLs returns server URLs from parsed agent config JSON.
 	ExtractConfigServerURLs(data map[string]interface{}) []string
+
+	ImportFile(src, dst string) error
 }

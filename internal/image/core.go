@@ -34,7 +34,8 @@ import (
 )
 
 // BuildCore builds the agent core image (exitbox-<agent>-core).
-func BuildCore(ctx context.Context, rt container.Runtime, agentName string, force bool) error {
+// If agentVersion is provided, it pins to that specific version instead of fetching latest.
+func BuildCore(ctx context.Context, rt container.Runtime, agentName string, force bool, agentVersion string) error {
 	imageName := fmt.Sprintf("exitbox-%s-core", agentName)
 	cmd := container.Cmd(rt)
 
@@ -44,8 +45,18 @@ func BuildCore(ctx context.Context, rt container.Runtime, agentName string, forc
 	}
 
 	// Only check for new agent versions when auto_update is on or --update passed
+	// If agentVersion is provided, use it instead of fetching latest
 	var latestVersion string
-	if AutoUpdate || force {
+	if agentVersion != "" {
+		latestVersion = agentVersion
+	} else if force {
+		// Force rebuild always checks for latest
+		var verErr error
+		latestVersion, verErr = a.GetLatestVersion()
+		if verErr != nil {
+			ui.Warnf("Failed to check for %s updates: %v", agentName, verErr)
+		}
+	} else if AutoUpdate {
 		var verErr error
 		latestVersion, verErr = a.GetLatestVersion()
 		if verErr != nil {

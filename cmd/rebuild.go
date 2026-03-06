@@ -29,11 +29,26 @@ import (
 )
 
 var rebuildWorkspace string
+var rebuildVersion string
 
 var rebuildCmd = &cobra.Command{
 	Use:   "rebuild <agent|all>",
 	Short: "Force rebuild of agent image(s)",
-	Args:  cobra.ExactArgs(1),
+	Long: `Force rebuild of agent image(s).
+
+Usage:
+  exitbox rebuild <agent>        Rebuild specific agent
+  exitbox rebuild all            Rebuild all enabled agents
+
+Options:
+  -w, --workspace NAME    Rebuild image for a specific workspace
+      --version VERSION   Pin specific agent version (e.g., 1.0.123)
+
+Examples:
+  exitbox rebuild claude                      Rebuild Claude with latest
+  exitbox rebuild claude --version 1.0.123    Rebuild Claude with specific version
+  exitbox rebuild all                         Rebuild all enabled agents`,
+	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		name := args[0]
 
@@ -43,11 +58,12 @@ var rebuildCmd = &cobra.Command{
 		}
 
 		image.Version = Version
-		image.AutoUpdate = true // rebuild always checks for latest
+		image.AutoUpdate = true // rebuild always checks for latest unless --version is passed
+
+		cfg := config.LoadOrDefault()
 
 		var agentNames []string
 		if name == "all" {
-			cfg := config.LoadOrDefault()
 			for _, a := range agents.All() {
 				if cfg.IsAgentEnabled(a.Name()) {
 					agentNames = append(agentNames, a.Name())
@@ -68,25 +84,36 @@ var rebuildCmd = &cobra.Command{
 		ctx := context.Background()
 
 		for _, agentName := range agentNames {
-			agt := agents.Get(agentName)
-			if agt == nil {
-				ui.Errorf("Unknown agent: %s", agentName)
-				continue
+			a := agents.Get(agentName)
+			ui.Infof("Rebuilding %s container image...", a.DisplayName())
+			version := rebuildVersion
+			if version == "" {
+				version = cfg.GetAgentVersion(agentName)
+			}
+			if version != "" {
+				ui.Infof("Pinning %s to version %s", a.DisplayName(), version)
+				image.AutoUpdate = false // don't fetch latest when version is pinned
+			}
+			// Set AgentVersion so BuildTools -> BuildCore also uses the pin
+			image.AgentVersion = version
+			if err := image.BuildCore(ctx, rt, agentName, true, version); err != nil {
+				ui.Errorf("Failed to rebuild %s core image: %v", a.DisplayName(), err)
 			}
 
-			ui.Infof("Rebuilding %s container image...", agt.DisplayName())
-			if err := image.BuildCore(ctx, rt, agentName, true); err != nil {
-				ui.Errorf("Failed to rebuild %s core image: %v", agt.DisplayName(), err)
+			ui.Infof("Rebuilding %s container image...", a.DisplayName())
+			if err := image.BuildCore(ctx, rt, agentName, true, version); err != nil {
+				ui.Errorf("Failed to rebuild %s core image: %v", a.DisplayName(), err)
 			}
 			if err := image.BuildProject(ctx, rt, agentName, projectDir, rebuildWorkspace, true); err != nil {
-				ui.Errorf("Failed to rebuild %s project image: %v", agt.DisplayName(), err)
+				ui.Errorf("Failed to rebuild %s project image: %v", a.DisplayName(), err)
 			}
-			ui.Successf("%s image rebuilt successfully", agt.DisplayName())
+			ui.Successf("%s image rebuilt successfully", a.DisplayName())
 		}
 	},
 }
 
 func init() {
 	rebuildCmd.Flags().StringVarP(&rebuildWorkspace, "workspace", "w", "", "Rebuild image for a specific workspace")
+	rebuildCmd.Flags().StringVar(&rebuildVersion, "version", "", "Pin specific agent version (e.g., 1.0.123)")
 	rootCmd.AddCommand(rebuildCmd)
 }

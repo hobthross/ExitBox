@@ -69,6 +69,7 @@ Flags (passed after the agent name):
       --resume [SESSION]  Resume a session by name/id (or last active if bare)
       --no-resume         Force a fresh session (overrides --name auto-resume)
   -u, --update            Check for and apply agent updates
+      --version VERSION   Pin specific agent version (e.g., 1.0.123)
   -v, --verbose           Enable verbose output
   -w, --workspace NAME    Use a specific workspace for this session
   -e, --env KEY=VALUE     Pass environment variables
@@ -153,6 +154,13 @@ func runAgent(agentName string, passthrough []string) {
 	image.SessionTools = flags.Tools
 	image.ForceRebuild = flags.ForceUpdate
 	image.AutoUpdate = cfg.Settings.AutoUpdate || flags.ForceUpdate
+
+	// Resolve agent version: CLI flag → config → empty (latest)
+	if flags.AgentVersion != "" {
+		image.AgentVersion = flags.AgentVersion
+	} else {
+		image.AgentVersion = cfg.GetAgentVersion(agentName)
+	}
 
 	// Validate workspace exists before attempting to run.
 	if flags.Workspace != "" {
@@ -335,6 +343,7 @@ type parsedFlags struct {
 	SessionName    string
 	SessionNameSet bool // true when --name was explicitly passed
 	Verbose        bool
+	AgentVersion   string
 	ForceUpdate    bool
 	Workspace      string
 	Ollama         bool
@@ -386,6 +395,11 @@ func parseRunFlags(passthrough []string, defaults config.DefaultFlags) parsedFla
 			f.Verbose = true
 		case "-u", "--update":
 			f.ForceUpdate = true
+		case "--version":
+			if i+1 < len(passthrough) {
+				i++
+				f.AgentVersion = passthrough[i]
+			}
 		case "-w", "--workspace":
 			if i+1 < len(passthrough) {
 				i++

@@ -59,7 +59,8 @@ type AgentConfig struct {
 
 // AgentEntry is the per-agent configuration.
 type AgentEntry struct {
-	Enabled bool `yaml:"enabled"`
+	Enabled bool   `yaml:"enabled"`
+	Version string `yaml:"version,omitempty"`
 }
 
 // ToolsConfig holds user-specified extra packages.
@@ -145,6 +146,19 @@ func (c *Config) IsAgentEnabled(name string) bool {
 		return c.Agents.Qwen.Enabled
 	}
 	return false
+}
+
+// GetAgentVersion returns the pinned version for a named agent, or "" if not set.
+func (c *Config) GetAgentVersion(name string) string {
+	switch name {
+	case "claude":
+		return c.Agents.Claude.Version
+	case "codex":
+		return c.Agents.Codex.Version
+	case "opencode":
+		return c.Agents.OpenCode.Version
+	}
+	return ""
 }
 
 // SetAgentEnabled sets the enable state for a named agent.

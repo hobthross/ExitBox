@@ -55,7 +55,7 @@ func BuildTools(ctx context.Context, rt container.Runtime, agentName string, for
 	cmd := container.Cmd(rt)
 
 	// Ensure core image exists
-	if err := BuildCore(ctx, rt, agentName, false); err != nil {
+	if err := BuildCore(ctx, rt, agentName, false, AgentVersion); err != nil {
 		return err
 	}
 

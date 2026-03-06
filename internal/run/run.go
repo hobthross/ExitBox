@@ -363,6 +363,9 @@ func AgentContainer(rt container.Runtime, opts Options) (int, error) {
 		if isReservedEnvVar(key) {
 			return 1, fmt.Errorf("environment variable '%s' is reserved", key)
 		}
+		if opts.Ollama && isOllamaEnvVar(key) {
+			return 1, fmt.Errorf("environment variable '%s' conflicts with --ollama", key)
+		}
 		args = append(args, "-e", ev)
 	}
 
@@ -519,12 +522,19 @@ func isReservedEnvVar(key string) bool {
 		"HTTPS_PROXY":             true,
 		"no_proxy":                true,
 		"NO_PROXY":                true,
-		"OLLAMA_HOST":             true,
-		"ANTHROPIC_BASE_URL":      true,
-		"ANTHROPIC_AUTH_TOKEN":    true,
-		"ANTHROPIC_API_KEY":       true,
-		"OPENAI_BASE_URL":         true,
 		"SSH_AUTH_SOCK":           true,
 	}
 	return reserved[key]
+}
+
+// isOllamaEnvVar returns true for env vars that are set by --ollama mode.
+// These are only reserved when --ollama is active; otherwise the user is
+// free to set them (e.g. to point an agent at a custom API endpoint).
+func isOllamaEnvVar(key string) bool {
+	switch key {
+	case "OLLAMA_HOST", "ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN",
+		"ANTHROPIC_API_KEY", "OPENAI_BASE_URL":
+		return true
+	}
+	return false
 }

@@ -219,7 +219,15 @@ The first access in a session prompts for the vault password. Subsequent reads o
 | `codex`     | OpenAI's Codex CLI           | None (downloaded)|
 | `opencode`  | OpenCode AI assistant        | None (binary download)  |
 
-All agents are installed inside the container. Existing host config (`~/.claude`, etc.) is imported once into managed storage on first run. Use `exitbox import <agent>` (or `exitbox import all`) to re-seed from host config. Use `--workspace` to target a specific workspace.
+All agents are installed inside the container. Existing host config (`~/.claude`, etc.) is imported once into managed storage on first run. Use `exitbox config import <agent>` (or `exitbox config import all`) to re-seed from host config. Use `--workspace` to target a specific workspace. Use `--config`/`-c` to import a specific config file. Use `exitbox config edit <agent>` to open the agent's primary config file in your editor:
+
+```bash
+exitbox config import codex -c config.toml          # Import a config file into Codex workspace
+exitbox config import opencode -c opencode.json     # Import OpenCode config file
+exitbox config import codex -c config.toml -w work  # Import into specific workspace
+exitbox config edit claude                           # Edit Claude settings.json in $EDITOR
+exitbox config edit codex -w work                    # Edit Codex config.toml for 'work' workspace
+```
 
 ## Installation
 
@@ -363,6 +371,8 @@ exitbox update            # Update ExitBox to the latest version
 exitbox aliases           # Print shell aliases for ~/.bashrc
 exitbox agents list       # List enabled agents and their status
 exitbox agents config <agent>  # Open agent config in $EDITOR
+exitbox config import <agent|all>  # Import agent config from host
+exitbox config edit <agent>        # Open agent config file in $EDITOR
 ```
 
 ### Config Generation
@@ -463,7 +473,7 @@ Agents are automatically informed about vault commands and these rules via sandb
 - **Development stacks**: Each workspace can have its own set of development profiles (languages/tools). The setup wizard or `exitbox workspaces add` lets you pick the stack for each workspace.
 - **Per-project auto-detection**: Workspaces can be scoped to a directory. When you run an agent from that directory, ExitBox automatically uses the matching workspace.
 - **Default workspace**: Set via `exitbox setup` or `exitbox workspaces default`. Used when no directory-scoped workspace matches.
-- **Credential import**: When creating a workspace, you can import credentials from the host or copy them from an existing workspace. You can also import later with `exitbox import <agent> --workspace <name>`.
+- **Credential import**: When creating a workspace, you can import credentials from the host or copy them from an existing workspace. You can also import later with `exitbox config import <agent> --workspace <name>`.
 
 #### Workspace Resolution Order
 
@@ -571,9 +581,10 @@ exitbox run -w work claude         # Use a specific workspace for this session
 exitbox run --full-git-support claude    # Mount host .gitconfig and SSH agent
 exitbox run --ollama claude              # Use host Ollama for local models
 exitbox run --memory 16g --cpus 8 claude # Custom resource limits
+exitbox run --version 1.0.123 claude   # Pin specific agent version
 ```
 
-All flags have long forms: `-f`/`--no-firewall`, `-r`/`--read-only`, `-v`/`--verbose`, `-n`/`--no-env`, `--resume [SESSION|TOKEN]`, `--no-resume`, `--name`, `-i`/`--include-dir`, `-t`/`--tools`, `-a`/`--allow-urls`, `-u`/`--update`, `-w`/`--workspace`, `--full-git-support`, `--ollama`, `--memory`, `--cpus`.
+All flags have long forms: `-f`/`--no-firewall`, `-r`/`--read-only`, `-v`/`--verbose`, `-n`/`--no-env`, `--resume [SESSION|TOKEN]`, `--no-resume`, `--name`, `-i`/`--include-dir`, `-t`/`--tools`, `-a`/`--allow-urls`, `-u`/`--update`, `-w`/`--workspace`, `--full-git-support`, `--ollama`, `--memory`, `--cpus`, `--version`.
 
 ## Available Profiles
 
@@ -640,6 +651,7 @@ workspaces:
 agents:
   claude:
     enabled: true
+    version: "1.0.123"    # pin agent version (omit for latest)
   codex:
     enabled: false
   opencode:
@@ -719,7 +731,7 @@ ExitBox enforces default resource limits to prevent runaway agents:
 
 ### What Gets Mounted
 
-ExitBox uses **managed config** (import-only) with per-workspace isolation. On first run, host config is copied into the active workspace's managed directory. Host originals are never modified. Use `exitbox import <agent>` to re-seed from host config at any time, optionally with `--workspace <name>` to target a specific workspace.
+ExitBox uses **managed config** (import-only) with per-workspace isolation. On first run, host config is copied into the active workspace's managed directory. Host originals are never modified. Use `exitbox config import <agent>` to re-seed from host config at any time, optionally with `--workspace <name>` to target a specific workspace.
 
 All managed paths follow the pattern `~/.config/exitbox/profiles/global/<workspace>/<agent>/`. For example, with workspace `default` and agent `claude`:
 
