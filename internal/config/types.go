@@ -157,6 +157,8 @@ func (c *Config) GetAgentVersion(name string) string {
 		return c.Agents.Codex.Version
 	case "opencode":
 		return c.Agents.OpenCode.Version
+	case "qwen":
+		return c.Agents.Qwen.Version
 	}
 	return ""
 }
