@@ -2,6 +2,7 @@ version: 1
 
 ai_providers:
   - anthropic.com
+  - qwen.ai
   - claude.ai
   - claude.com
   - openai.com

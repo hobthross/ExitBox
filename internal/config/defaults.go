@@ -78,6 +78,7 @@ func DefaultAllowlist() *Allowlist {
 		Version: 1,
 		AIProviders: []string{
 			"anthropic.com",
+			"qwen.ai",
 			"claude.ai",
 			"claude.com",
 			"openai.com",

@@ -17,6 +17,9 @@ anthropic.com
 claude.ai
 claude.com
 
+# Qwen
+qwen.ai
+
 # OpenAI (Codex, ChatGPT, GPT-4)
 openai.com
 chatgpt.com

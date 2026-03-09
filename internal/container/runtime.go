@@ -49,6 +49,8 @@ type shellRuntime struct {
 	cmd string
 }
 
+var _ Runtime = &shellRuntime{}
+
 func (r *shellRuntime) Name() string { return r.cmd }
 
 func (r *shellRuntime) Build(ctx context.Context, args []string) error {
