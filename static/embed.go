@@ -40,6 +40,9 @@ var ExitboxAllowAmd64 []byte
 //go:embed build/exitbox-allow-arm64
 var ExitboxAllowArm64 []byte
 
+//go:embed build/exitbox-allow-ipc.py
+var ExitboxAllowIPC []byte
+
 //go:embed build/exitbox-vault-amd64
 var ExitboxVaultAmd64 []byte
 

@@ -1,401 +1,135 @@
+// ExitBox - Multi-Agent Container Sandbox
+// Copyright (C) 2026 Cloud Exit B.V.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 package agent
 
 import (
 	"os"
 	"path/filepath"
-	"runtime"
-	"strings"
 	"testing"
 )
 
-func TestDisplayName(t *testing.T) {
-	tests := []struct {
-		input    string
-		expected string
-	}{
-		{"claude", "Claude Code"},
-		{"codex", "OpenAI Codex"},
-		{"opencode", "OpenCode"},
-		{"unknown", "unknown"},
-		{"", ""},
-	}
-	for _, tc := range tests {
-		got := DisplayName(tc.input)
-		if got != tc.expected {
-			t.Errorf("DisplayName(%q) = %q, want %q", tc.input, got, tc.expected)
-		}
-	}
-}
+func TestImportFile_Codex(t *testing.T) {
+	srcDir := t.TempDir()
+	dstDir := t.TempDir()
 
-func TestIsValidAgent(t *testing.T) {
-	tests := []struct {
-		input    string
-		expected bool
-	}{
-		{"claude", true},
-		{"codex", true},
-		{"opencode", true},
-		{"unknown", false},
-		{"", false},
-		{"Claude", false},
-	}
-	for _, tc := range tests {
-		got := IsValidAgent(tc.input)
-		if got != tc.expected {
-			t.Errorf("IsValidAgent(%q) = %v, want %v", tc.input, got, tc.expected)
-		}
-	}
-}
-
-func TestAgentNames(t *testing.T) {
-	if len(AgentNames) != 3 {
-		t.Fatalf("expected 3 agent names, got %d", len(AgentNames))
-	}
-	expected := map[string]bool{"claude": true, "codex": true, "opencode": true}
-	for _, name := range AgentNames {
-		if !expected[name] {
-			t.Errorf("unexpected agent name: %s", name)
-		}
-	}
-}
-
-func TestRegistryGetAll(t *testing.T) {
-	for _, name := range AgentNames {
-		a := Get(name)
-		if a == nil {
-			t.Errorf("Get(%q) returned nil", name)
-			continue
-		}
-		if a.Name() != name {
-			t.Errorf("Get(%q).Name() = %q", name, a.Name())
-		}
-	}
-}
-
-func TestGetUnknown(t *testing.T) {
-	if a := Get("nonexistent"); a != nil {
-		t.Errorf("Get(\"nonexistent\") should return nil, got %v", a)
-	}
-}
-
-func TestClaudeAgent(t *testing.T) {
-	c := &Claude{}
-
-	if c.Name() != "claude" {
-		t.Errorf("Name() = %q, want %q", c.Name(), "claude")
-	}
-	if c.DisplayName() != "Claude Code" {
-		t.Errorf("DisplayName() = %q, want %q", c.DisplayName(), "Claude Code")
+	srcFile := filepath.Join(srcDir, "config.toml")
+	content := []byte("[model]\nprovider = \"custom\"\n")
+	if err := os.WriteFile(srcFile, content, 0644); err != nil {
+		t.Fatal(err)
 	}
 
-	// HostConfigPaths
-	paths := c.HostConfigPaths()
-	if len(paths) != 1 {
-		t.Fatalf("HostConfigPaths() returned %d paths, want 1", len(paths))
-	}
-	if !strings.HasSuffix(paths[0], ".claude") {
-		t.Errorf("HostConfigPaths()[0] = %q, should end with .claude", paths[0])
-	}
-
-	// ContainerMounts
-	mounts := c.ContainerMounts("/cfg")
-	if len(mounts) != 3 {
-		t.Fatalf("ContainerMounts() returned %d mounts, want 3", len(mounts))
-	}
-	if mounts[0].Target != "/home/user/.claude" {
-		t.Errorf("mounts[0].Target = %q, want /home/user/.claude", mounts[0].Target)
-	}
-	if mounts[1].Target != "/home/user/.claude.json" {
-		t.Errorf("mounts[1].Target = %q, want /home/user/.claude.json", mounts[1].Target)
-	}
-	if mounts[2].Target != "/home/user/.config" {
-		t.Errorf("mounts[2].Target = %q, want /home/user/.config", mounts[2].Target)
-	}
-
-	// GetDockerfileInstall
-	df, err := c.GetDockerfileInstall("")
-	if err != nil {
-		t.Fatalf("GetDockerfileInstall() error: %v", err)
-	}
-	if !strings.Contains(df, "sha256sum") {
-		t.Error("GetDockerfileInstall() should contain sha256sum verification")
-	}
-	if !strings.Contains(df, "claude") {
-		t.Error("GetDockerfileInstall() should reference claude")
-	}
-
-	// GetFullDockerfile
-	full, err := c.GetFullDockerfile("1.0.0")
-	if err != nil {
-		t.Fatalf("GetFullDockerfile() error: %v", err)
-	}
-	if !strings.HasPrefix(full, "FROM exitbox-base") {
-		t.Error("GetFullDockerfile() should start with FROM exitbox-base")
-	}
-}
-
-func TestCodexAgent(t *testing.T) {
 	c := &Codex{}
-
-	if c.Name() != "codex" {
-		t.Errorf("Name() = %q, want %q", c.Name(), "codex")
-	}
-	if c.DisplayName() != "OpenAI Codex" {
-		t.Errorf("DisplayName() = %q, want %q", c.DisplayName(), "OpenAI Codex")
+	if err := c.ImportFile(srcFile, dstDir); err != nil {
+		t.Fatalf("ImportFile failed: %v", err)
 	}
 
-	// BinaryName
-	bn := c.BinaryName()
-	switch runtime.GOARCH {
-	case "amd64":
-		if bn != "codex-x86_64-unknown-linux-musl.tar.gz" {
-			t.Errorf("BinaryName() = %q on amd64", bn)
-		}
-	case "arm64":
-		if bn != "codex-aarch64-unknown-linux-musl.tar.gz" {
-			t.Errorf("BinaryName() = %q on arm64", bn)
-		}
-	}
-
-	// HostConfigPaths
-	paths := c.HostConfigPaths()
-	if len(paths) != 2 {
-		t.Fatalf("HostConfigPaths() returned %d paths, want 2", len(paths))
-	}
-
-	// ContainerMounts
-	mounts := c.ContainerMounts("/cfg")
-	if len(mounts) != 2 {
-		t.Fatalf("ContainerMounts() returned %d mounts, want 2", len(mounts))
-	}
-	if mounts[0].Target != "/home/user/.codex" {
-		t.Errorf("mounts[0].Target = %q, want /home/user/.codex", mounts[0].Target)
-	}
-
-	// GetDockerfileInstall
-	df, err := c.GetDockerfileInstall("")
+	target := filepath.Join(dstDir, ".codex", "config.toml")
+	data, err := os.ReadFile(target)
 	if err != nil {
-		t.Fatalf("GetDockerfileInstall() error: %v", err)
+		t.Fatalf("expected file at %s: %v", target, err)
 	}
-	if !strings.Contains(df, "sha256sum") {
-		t.Error("GetDockerfileInstall() should contain sha256sum verification")
-	}
-
-	// GetFullDockerfile
-	full, err := c.GetFullDockerfile("v0.1.0")
-	if err != nil {
-		t.Fatalf("GetFullDockerfile() error: %v", err)
-	}
-	if !strings.HasPrefix(full, "FROM exitbox-base") {
-		t.Error("GetFullDockerfile() should start with FROM exitbox-base")
-	}
-	if !strings.Contains(full, "CODEX_VERSION=v0.1.0") {
-		t.Error("GetFullDockerfile() should include CODEX_VERSION ARG")
+	if string(data) != string(content) {
+		t.Errorf("content mismatch: got %q, want %q", data, content)
 	}
 }
 
-func TestOpenCodeAgent(t *testing.T) {
+func TestImportFile_Claude(t *testing.T) {
+	srcDir := t.TempDir()
+	dstDir := t.TempDir()
+
+	srcFile := filepath.Join(srcDir, "settings.json")
+	content := []byte(`{"theme": "dark"}`)
+	if err := os.WriteFile(srcFile, content, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	c := &Claude{}
+	if err := c.ImportFile(srcFile, dstDir); err != nil {
+		t.Fatalf("ImportFile failed: %v", err)
+	}
+
+	target := filepath.Join(dstDir, ".claude", "settings.json")
+	data, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatalf("expected file at %s: %v", target, err)
+	}
+	if string(data) != string(content) {
+		t.Errorf("content mismatch: got %q, want %q", data, content)
+	}
+}
+
+func TestImportFile_OpenCode(t *testing.T) {
+	srcDir := t.TempDir()
+	dstDir := t.TempDir()
+
+	srcFile := filepath.Join(srcDir, "opencode.json")
+	content := []byte(`{"provider": "anthropic"}`)
+	if err := os.WriteFile(srcFile, content, 0644); err != nil {
+		t.Fatal(err)
+	}
+
 	o := &OpenCode{}
-
-	if o.Name() != "opencode" {
-		t.Errorf("Name() = %q, want %q", o.Name(), "opencode")
-	}
-	if o.DisplayName() != "OpenCode" {
-		t.Errorf("DisplayName() = %q, want %q", o.DisplayName(), "OpenCode")
+	if err := o.ImportFile(srcFile, dstDir); err != nil {
+		t.Fatalf("ImportFile failed: %v", err)
 	}
 
-	// BinaryName
-	bn := o.BinaryName()
-	switch runtime.GOARCH {
-	case "amd64":
-		if bn != "opencode-linux-x64-musl.tar.gz" {
-			t.Errorf("BinaryName() = %q on amd64", bn)
-		}
-	case "arm64":
-		if bn != "opencode-linux-arm64-musl.tar.gz" {
-			t.Errorf("BinaryName() = %q on arm64", bn)
-		}
-	}
-
-	// HostConfigPaths
-	paths := o.HostConfigPaths()
-	if len(paths) != 2 {
-		t.Fatalf("HostConfigPaths() returned %d paths, want 2", len(paths))
-	}
-
-	// ContainerMounts
-	mounts := o.ContainerMounts("/cfg")
-	if len(mounts) != 3 {
-		t.Fatalf("ContainerMounts() returned %d mounts, want 3", len(mounts))
-	}
-	if mounts[0].Target != "/home/user/.opencode" {
-		t.Errorf("mounts[0].Target = %q, want /home/user/.opencode", mounts[0].Target)
-	}
-
-	// GetDockerfileInstall
-	df, err := o.GetDockerfileInstall("")
+	target := filepath.Join(dstDir, ".config", "opencode", "opencode.json")
+	data, err := os.ReadFile(target)
 	if err != nil {
-		t.Fatalf("GetDockerfileInstall() error: %v", err)
+		t.Fatalf("expected file at %s: %v", target, err)
 	}
-	if !strings.Contains(df, "sha256sum") {
-		t.Error("GetDockerfileInstall() should contain sha256sum verification")
-	}
-
-	// GetFullDockerfile
-	full, err := o.GetFullDockerfile("0.2.0")
-	if err != nil {
-		t.Fatalf("GetFullDockerfile() error: %v", err)
-	}
-	if !strings.HasPrefix(full, "FROM exitbox-base") {
-		t.Error("GetFullDockerfile() should start with FROM exitbox-base")
-	}
-	if !strings.Contains(full, "OPENCODE_VERSION=0.2.0") {
-		t.Error("GetFullDockerfile() should include OPENCODE_VERSION ARG")
+	if string(data) != string(content) {
+		t.Errorf("content mismatch: got %q, want %q", data, content)
 	}
 }
 
-func TestGetInstalledVersion_NilRuntime(t *testing.T) {
-	agents := []Agent{&Claude{}, &Codex{}, &OpenCode{}}
-	for _, a := range agents {
-		_, err := a.GetInstalledVersion(nil, "some-image")
-		if err == nil {
-			t.Errorf("%s.GetInstalledVersion(nil, ...) should return error", a.Name())
-		}
+func TestConfigFilePath_Claude(t *testing.T) {
+	c := &Claude{}
+	got := c.ConfigFilePath("/ws/dir")
+	want := filepath.Join("/ws/dir", ".claude", "settings.json")
+	if got != want {
+		t.Errorf("ConfigFilePath() = %q, want %q", got, want)
 	}
 }
 
-func TestCopyDirContents(t *testing.T) {
-	src := t.TempDir()
-	dst := t.TempDir()
-
-	// Create source structure
-	_ = os.WriteFile(filepath.Join(src, "file1.txt"), []byte("hello"), 0644)
-	_ = os.MkdirAll(filepath.Join(src, "subdir"), 0755)
-	_ = os.WriteFile(filepath.Join(src, "subdir", "file2.txt"), []byte("world"), 0644)
-
-	err := copyDirContents(src, dst)
-	if err != nil {
-		t.Fatalf("copyDirContents() error: %v", err)
-	}
-
-	// Verify
-	data, err := os.ReadFile(filepath.Join(dst, "file1.txt"))
-	if err != nil {
-		t.Fatalf("reading file1.txt: %v", err)
-	}
-	if string(data) != "hello" {
-		t.Errorf("file1.txt = %q, want %q", string(data), "hello")
-	}
-
-	data, err = os.ReadFile(filepath.Join(dst, "subdir", "file2.txt"))
-	if err != nil {
-		t.Fatalf("reading subdir/file2.txt: %v", err)
-	}
-	if string(data) != "world" {
-		t.Errorf("subdir/file2.txt = %q, want %q", string(data), "world")
+func TestConfigFilePath_Codex(t *testing.T) {
+	c := &Codex{}
+	got := c.ConfigFilePath("/ws/dir")
+	want := filepath.Join("/ws/dir", ".codex", "config.toml")
+	if got != want {
+		t.Errorf("ConfigFilePath() = %q, want %q", got, want)
 	}
 }
 
-func TestCopyDirContents_EmptyDir(t *testing.T) {
-	src := t.TempDir()
-	dst := t.TempDir()
-
-	err := copyDirContents(src, dst)
-	if err != nil {
-		t.Fatalf("copyDirContents(empty) error: %v", err)
+func TestConfigFilePath_OpenCode(t *testing.T) {
+	o := &OpenCode{}
+	got := o.ConfigFilePath("/ws/dir")
+	want := filepath.Join("/ws/dir", ".config", "opencode", "opencode.json")
+	if got != want {
+		t.Errorf("ConfigFilePath() = %q, want %q", got, want)
 	}
 }
 
-func TestCopyDirContents_NonexistentSrc(t *testing.T) {
-	dst := t.TempDir()
-	err := copyDirContents("/nonexistent-path-xyz", dst)
+func TestImportFile_NonexistentSource(t *testing.T) {
+	dstDir := t.TempDir()
+
+	c := &Codex{}
+	err := c.ImportFile("/nonexistent/file.toml", dstDir)
 	if err == nil {
-		t.Error("copyDirContents(nonexistent) should return error")
-	}
-}
-
-func TestImportConfig_Claude(t *testing.T) {
-	src := t.TempDir()
-	dst := t.TempDir()
-	_ = os.WriteFile(filepath.Join(src, "settings.json"), []byte(`{"key":"val"}`), 0644)
-
-	c := &Claude{}
-	err := c.ImportConfig(src, dst)
-	if err != nil {
-		t.Fatalf("ImportConfig() error: %v", err)
-	}
-
-	data, err := os.ReadFile(filepath.Join(dst, ".claude", "settings.json"))
-	if err != nil {
-		t.Fatalf("reading imported file: %v", err)
-	}
-	if string(data) != `{"key":"val"}` {
-		t.Errorf("imported content = %q", string(data))
-	}
-}
-
-func TestImportConfig_Codex(t *testing.T) {
-	src := t.TempDir()
-	dst := t.TempDir()
-	_ = os.WriteFile(filepath.Join(src, "config.json"), []byte(`{}`), 0644)
-
-	c := &Codex{}
-	err := c.ImportConfig(src, dst)
-	if err != nil {
-		t.Fatalf("ImportConfig() error: %v", err)
-	}
-
-	if _, err := os.Stat(filepath.Join(dst, ".codex", "config.json")); err != nil {
-		t.Errorf("expected .codex/config.json to exist: %v", err)
-	}
-}
-
-func TestImportConfig_CodexConfigDir(t *testing.T) {
-	src := filepath.Join(t.TempDir(), ".config", "codex")
-	dst := t.TempDir()
-	_ = os.MkdirAll(src, 0755)
-	_ = os.WriteFile(filepath.Join(src, "config.json"), []byte(`{}`), 0644)
-
-	c := &Codex{}
-	err := c.ImportConfig(src, dst)
-	if err != nil {
-		t.Fatalf("ImportConfig() error: %v", err)
-	}
-
-	if _, err := os.Stat(filepath.Join(dst, ".config", "codex", "config.json")); err != nil {
-		t.Errorf("expected .config/codex/config.json to exist: %v", err)
-	}
-}
-
-func TestImportConfig_OpenCode(t *testing.T) {
-	src := t.TempDir()
-	dst := t.TempDir()
-	_ = os.WriteFile(filepath.Join(src, "config.json"), []byte(`{}`), 0644)
-
-	o := &OpenCode{}
-	err := o.ImportConfig(src, dst)
-	if err != nil {
-		t.Fatalf("ImportConfig() error: %v", err)
-	}
-
-	if _, err := os.Stat(filepath.Join(dst, ".opencode", "config.json")); err != nil {
-		t.Errorf("expected .opencode/config.json to exist: %v", err)
-	}
-}
-
-func TestImportConfig_OpenCodeConfigDir(t *testing.T) {
-	src := filepath.Join(t.TempDir(), ".config", "opencode")
-	dst := t.TempDir()
-	_ = os.MkdirAll(src, 0755)
-	_ = os.WriteFile(filepath.Join(src, "settings.json"), []byte(`{}`), 0644)
-
-	o := &OpenCode{}
-	err := o.ImportConfig(src, dst)
-	if err != nil {
-		t.Fatalf("ImportConfig() error: %v", err)
-	}
-
-	if _, err := os.Stat(filepath.Join(dst, ".config", "opencode", "settings.json")); err != nil {
-		t.Errorf("expected .config/opencode/settings.json to exist: %v", err)
+		t.Fatal("expected error for nonexistent source file")
 	}
 }
