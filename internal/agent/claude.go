@@ -61,21 +61,30 @@ func (c *Claude) GetInstalledVersion(rt container.Runtime, img string) (string, 
 }
 
 func (c *Claude) GetDockerfileInstall(buildCtx string) (string, error) {
-	return `# Install Claude Code via npm (as root for global prefix access)
+	return `
+RUN apk add --no-cache musl-dev gcc && \
+    printf '#include <sys/syscall.h>\n#include <unistd.h>\nint posix_getdents(int fd, void *buf, unsigned long nbytes, int flags) {\n  (void)flags;\n  return syscall(SYS_getdents64, fd, buf, nbytes);\n}\n' \
+        > /tmp/posix_getdents.c && \
+    gcc -shared -o /usr/local/lib/posix_getdents.so /tmp/posix_getdents.c && \
+    rm /tmp/posix_getdents.c && \
+    apk del musl-dev gcc
+
+ENV LD_PRELOAD="/lib/libgcompat.so.0 /usr/local/lib/posix_getdents.so"
+
 ARG CLAUDE_VERSION
 RUN set -e && \
     if [ -n "$CLAUDE_VERSION" ]; then \
-        npm install -g "@anthropic-ai/claude-code@${CLAUDE_VERSION}"; \
+        curl -fsSL https://claude.ai/install.sh | bash -s "$CLAUDE_VERSION"; \
     else \
-        npm install -g @anthropic-ai/claude-code; \
+        curl -fsSL https://claude.ai/install.sh | bash; \
     fi && \
     claude --version && \
     echo "Claude Code installed successfully"
-# Configure auto-updater disable for runtime user
-USER user
-RUN mkdir -p "$HOME/.claude" && \
-    echo '{"env":{"DISABLE_AUTOUPDATER":"1"}}' > "$HOME/.claude/settings.json"
-USER root`, nil
+
+# Configure settings for runtime user (as root, since /home/user may not be owned by user yet)
+RUN mkdir -p /home/user/.claude && \
+    echo '{"env":{"DISABLE_AUTOUPDATER":"1","USE_BUILTIN_RIPGREP":"0"}}' > /home/user/.claude/settings.json && \
+    chown -R user:user /home/user/.claude`, nil
 }
 
 

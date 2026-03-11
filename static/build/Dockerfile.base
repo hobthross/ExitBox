@@ -40,9 +40,9 @@ RUN --mount=type=cache,target=/var/cache/apk \
     # Networking
     bind-tools netcat-openbsd socat \
     # Terminal
-    tmux  \
-    # Runtime for Claude Code
-    nodejs npm
+    tmux \
+    # Native Claude Code dependencies (Alpine/musl)
+    libgcc libstdc++ gcompat
 
 # Install yq (architecture-aware, version-pinned, checksum-verified)
 RUN if [ "$TARGETARCH" = "x86_64" ] || [ "$TARGETARCH" = "amd64" ]; then \
