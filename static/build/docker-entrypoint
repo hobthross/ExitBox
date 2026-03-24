@@ -9,7 +9,10 @@ set -e
 WORKSPACE="/workspace"
 CODEX_CALLBACK_PORT="1455"
 CODEX_RELAY_PORT="2455"
+OPENCODE_CALLBACK_PORT="8085"
+OPENCODE_RELAY_PORT="2085"
 RELAY_PID=""
+OPENCODE_RELAY_PID=""
 WORKSPACE_SWITCH_FILE="/workspace/.exitbox/workspace-switch"
 SESSION_ACTION_FILE="/workspace/.exitbox/session-action"
 GLOBAL_CONFIG_FILE="/home/user/.exitbox-config/config.yaml"
@@ -95,6 +98,9 @@ cleanup_relay() {
     if [[ -n "$RELAY_PID" ]]; then
         kill "$RELAY_PID" >/dev/null 2>&1 || true
     fi
+    if [[ -n "$OPENCODE_RELAY_PID" ]]; then
+        kill "$OPENCODE_RELAY_PID" >/dev/null 2>&1 || true
+    fi
 }
 
 start_codex_callback_relay() {
@@ -106,6 +112,17 @@ start_codex_callback_relay() {
     # Relay container-reachable traffic on 2455 to Codex's localhost callback on 1455.
     socat "TCP-LISTEN:${CODEX_RELAY_PORT},bind=0.0.0.0,reuseaddr,fork" "TCP:127.0.0.1:${CODEX_CALLBACK_PORT}" >/tmp/codex-oauth-relay.log 2>&1 &
     RELAY_PID="$!"
+}
+
+start_opencode_callback_relay() {
+    if ! command -v socat >/dev/null 2>&1; then
+        echo "[WARN] socat not found; OpenCode OAuth callback relay disabled" >&2
+        return 0
+    fi
+
+    # Relay container-reachable traffic on 2085 to OpenCode's localhost callback on 8085.
+    socat "TCP-LISTEN:${OPENCODE_RELAY_PORT},bind=0.0.0.0,reuseaddr,fork" "TCP:127.0.0.1:${OPENCODE_CALLBACK_PORT}" >/tmp/opencode-oauth-relay.log 2>&1 &
+    OPENCODE_RELAY_PID="$!"
 }
 
 IDE_RELAY_PID=""
@@ -312,6 +329,43 @@ apply_active_workspace_links() {
             link_path "$workspace_root/.local/share/opencode" "$HOME/.local/share/opencode"
             link_path "$workspace_root/.local/state" "$HOME/.local/state"
             link_path "$workspace_root/.cache/opencode" "$HOME/.cache/opencode"
+            ;;
+    esac
+}
+
+link_skills() {
+    local ws_name="${EXITBOX_WORKSPACE_NAME:-default}"
+    local skills_src="${GLOBAL_WORKSPACE_ROOT}/${ws_name}/skills"
+
+    [[ -d "$skills_src" ]] || return 0
+
+    # Create a real skills directory inside each agent's config path,
+    # then symlink each individual skill into it. Using a real parent
+    # directory with per-skill symlinks ensures agents discover them
+    # (whole-directory symlinks are not always followed by skill discovery).
+    _link_skills_into() {
+        local target_dir="$1"
+        mkdir -p "$target_dir"
+        for skill in "$skills_src"/*/; do
+            [[ -d "$skill" ]] || continue
+            ln -sfn "$skill" "${target_dir}/$(basename "$skill")"
+        done
+    }
+
+    case "$AGENT" in
+        claude)
+            local real_dir
+            real_dir="$(readlink -f "$HOME/.claude")"
+            [[ -d "$real_dir" ]] && _link_skills_into "$real_dir/skills"
+            ;;
+        codex)
+            _link_skills_into "$HOME/.agents/skills"
+            ;;
+        opencode)
+            local real_dir
+            real_dir="$(readlink -f "$HOME/.config/opencode")"
+            [[ -d "$real_dir" ]] && _link_skills_into "$real_dir/skills"
+            _link_skills_into "$HOME/.agents/skills"
             ;;
     esac
 }
@@ -738,6 +792,7 @@ run_agent_loop() {
     if [[ -n "$AGENT" ]]; then
         inject_sandbox_instructions
         inject_codex_approval_rules
+        link_skills
     fi
 
     build_resume_args
@@ -971,11 +1026,17 @@ You are running inside an ExitBox sandboxed container. Important constraints:
   The host user will then be prompted a second time on the host terminal to confirm.
   Wait for the result before proceeding.
   If approved, retry the original request. If denied, inform the user and do not retry.
-  Extract the domain from the failing URL and request it.
+  IMPORTANT: Always request the ROOT domain, NOT subdomains. Allowing a root domain
+  automatically covers ALL its subdomains (e.g. allowing \`bunny.net\` also allows
+  \`fonts.bunny.net\`, \`cdn.bunny.net\`, etc.). NEVER request both a domain and its
+  subdomain — this causes a firewall configuration error.
+  To extract the root domain: strip the subdomain prefix. For \`fonts.bunny.net\` use
+  \`bunny.net\`. For \`api.github.com\` use \`github.com\`. For two-part TLDs like
+  \`s3.amazonaws.com\`, use \`amazonaws.com\`.
   Examples:
-    exitbox-allow registry.npmjs.org
-    exitbox-allow api.github.com
-    exitbox-allow bunny.net
+    exitbox-allow bunny.net          # covers fonts.bunny.net, cdn.bunny.net, etc.
+    exitbox-allow npmjs.org          # covers registry.npmjs.org
+    exitbox-allow example.com        # covers api.example.com, www.example.com, etc.
 - SENSITIVE DATA: When any command output, log, or file content contains sensitive
   information (passwords, API keys, tokens, secrets, credentials, private keys),
   you MUST replace the actual values with \`<redacted>\` before displaying them to the
@@ -1403,6 +1464,8 @@ cd "$WORKSPACE"
 
 if [[ "$AGENT" == "codex" ]]; then
     start_codex_callback_relay
+elif [[ "$AGENT" == "opencode" ]]; then
+    start_opencode_callback_relay
 fi
 start_ide_relay
 setup_git_credential_helper
@@ -1454,6 +1517,7 @@ if [[ -n "$AGENT" ]]; then
     apply_active_workspace_links
     inject_sandbox_instructions
     inject_codex_approval_rules
+    link_skills
 fi
 
 # Debug: show what's available

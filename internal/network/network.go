@@ -35,6 +35,26 @@ const (
 	SquidContainer  = "exitbox-squid"
 )
 
+// reconfigureSquid sends a HUP to the running squid process. If that fails
+// (stale PID, process crashed), it restarts squid inside the container.
+func reconfigureSquid(cmd string) {
+	recCmd := exec.Command(cmd, "exec", SquidContainer, "squid", "-k", "reconfigure")
+	if out, err := recCmd.CombinedOutput(); err != nil {
+		detail := strings.TrimSpace(string(out))
+		// Config is written before this call, so a parse failure means bad config.
+		parseCmd := exec.Command(cmd, "exec", SquidContainer, "squid", "-k", "parse")
+		if parseOut, parseErr := parseCmd.CombinedOutput(); parseErr != nil {
+			ui.Warnf("Squid config error: %s", strings.TrimSpace(string(parseOut)))
+			return
+		}
+		// Config is valid but reconfigure failed (stale PID / process died).
+		restartCmd := exec.Command(cmd, "exec", SquidContainer, "sh", "-c", "squid -k shutdown 2>/dev/null; sleep 1; squid")
+		if _, restartErr := restartCmd.CombinedOutput(); restartErr != nil {
+			ui.Warnf("Failed to restart squid (reconfigure failed: %s): %v", detail, restartErr)
+		}
+	}
+}
+
 // EnsureNetworks creates the shared networks if they don't exist.
 func EnsureNetworks(rt container.Runtime) {
 	if !rt.NetworkExists(InternalNetwork) {
@@ -110,12 +130,16 @@ func RemoveSessionURLs(rt container.Runtime, containerName string) {
 
 	// Collect remaining URLs from all sessions and regenerate config
 	remaining := collectAllSessionURLs()
-	if err := writeSquidConfig(rt, remaining); err != nil {
-		ui.Warnf("Failed to regenerate squid config: %v", err)
+	changed, writeErr := writeSquidConfig(rt, remaining)
+	if writeErr != nil {
+		ui.Warnf("Failed to regenerate squid config: %v", writeErr)
 		return
 	}
 
-	// Reconfigure squid if running
+	// Reconfigure squid if running and config changed
+	if !changed {
+		return
+	}
 	cmd := container.Cmd(rt)
 	names, err := rt.PS("", "{{.Names}}")
 	if err != nil {
@@ -124,9 +148,7 @@ func RemoveSessionURLs(rt container.Runtime, containerName string) {
 	}
 	for _, n := range names {
 		if n == SquidContainer {
-			if recErr := exec.Command(cmd, "exec", SquidContainer, "squid", "-k", "reconfigure").Run(); recErr != nil {
-				ui.Warnf("Failed to reconfigure squid: %v", recErr)
-			}
+			reconfigureSquid(cmd)
 			break
 		}
 	}
@@ -181,12 +203,13 @@ func StartSquidProxy(rt container.Runtime, containerName string, extraURLs []str
 	}
 	for _, n := range names {
 		if n == SquidContainer {
-			// Regenerate config with all session URLs and reload
-			if err := writeSquidConfig(rt, allExtraURLs); err != nil {
-				return err
+			// Regenerate config and reload only if it changed.
+			changed, writeErr := writeSquidConfig(rt, allExtraURLs)
+			if writeErr != nil {
+				return writeErr
 			}
-			if recErr := exec.Command(cmd, "exec", SquidContainer, "squid", "-k", "reconfigure").Run(); recErr != nil {
-				ui.Warnf("Failed to reconfigure squid: %v", recErr)
+			if changed {
+				reconfigureSquid(cmd)
 			}
 			return nil
 		}
@@ -199,7 +222,7 @@ func StartSquidProxy(rt container.Runtime, containerName string, extraURLs []str
 	EnsureNetworks(rt)
 
 	// Generate config
-	if err := writeSquidConfig(rt, allExtraURLs); err != nil {
+	if _, err := writeSquidConfig(rt, allExtraURLs); err != nil {
 		return err
 	}
 
@@ -328,8 +351,12 @@ func AddSessionURLAndReload(rt container.Runtime, containerName string, domain s
 	}
 
 	allURLs := collectAllSessionURLs()
-	if err := writeSquidConfig(rt, allURLs); err != nil {
-		return err
+	changed, writeErr := writeSquidConfig(rt, allURLs)
+	if writeErr != nil {
+		return writeErr
+	}
+	if !changed {
+		return nil
 	}
 
 	// Hot-reload Squid.
@@ -340,9 +367,7 @@ func AddSessionURLAndReload(rt container.Runtime, containerName string, domain s
 	}
 	for _, n := range names {
 		if n == SquidContainer {
-			if recErr := exec.Command(cmd, "exec", SquidContainer, "squid", "-k", "reconfigure").Run(); recErr != nil {
-				ui.Warnf("Failed to reconfigure squid: %v", recErr)
-			}
+			reconfigureSquid(cmd)
 			break
 		}
 	}
@@ -350,10 +375,12 @@ func AddSessionURLAndReload(rt container.Runtime, containerName string, domain s
 	return nil
 }
 
-func writeSquidConfig(rt container.Runtime, extraURLs []string) error {
+// writeSquidConfig generates and writes the squid config. Returns (changed, error)
+// where changed indicates whether the config file content actually changed.
+func writeSquidConfig(rt container.Runtime, extraURLs []string) (bool, error) {
 	subnet, err := GetNetworkSubnet(rt, InternalNetwork)
 	if err != nil {
-		return fmt.Errorf("could not detect internal network subnet: %w", err)
+		return false, fmt.Errorf("could not detect internal network subnet: %w", err)
 	}
 
 	al := config.LoadAllowlistOrDefault()
@@ -362,9 +389,15 @@ func writeSquidConfig(rt container.Runtime, extraURLs []string) error {
 	content := GenerateSquidConfig(subnet, domains, extraURLs)
 	configFile := filepath.Join(config.Cache, "squid.conf")
 	if err := os.MkdirAll(filepath.Dir(configFile), 0755); err != nil {
-		return fmt.Errorf("failed to create config directory: %w", err)
+		return false, fmt.Errorf("failed to create config directory: %w", err)
 	}
-	return os.WriteFile(configFile, []byte(content), 0644)
+
+	// Skip write if content hasn't changed (avoids unnecessary squid reconfigure).
+	if existing, readErr := os.ReadFile(configFile); readErr == nil && string(existing) == content {
+		return false, nil
+	}
+
+	return true, os.WriteFile(configFile, []byte(content), 0644)
 }
 
 func getSquidDNSServers() []string {

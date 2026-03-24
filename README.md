@@ -156,6 +156,17 @@ git push origin main   # uses gh credential helper for HTTPS
 
 The token is never stored in the container filesystem. Every vault read triggers a host-side approval popup, giving you full control over secret access.
 
+### OpenCode Authentication
+
+OpenCode supports OAuth login for providers like Google (Gemini). The OAuth flow starts a local callback server inside the container, and ExitBox automatically publishes the callback port (8085) to the host so the browser redirect works.
+
+```bash
+exitbox run opencode -- auth login    # starts OAuth flow, opens browser URL on host
+exitbox run opencode -- auth logout   # remove stored credentials
+```
+
+When the firewall is active, Google OAuth domains (`google.com`, `googleapis.com`) are included in the default allowlist. If you use a provider with a different OAuth domain, add it via `exitbox-allow <domain>` or the `-a` flag.
+
 ### RTK Token Optimizer (Experimental)
 
 [rtk](https://github.com/rtk-ai/rtk) wraps common CLI commands to produce compact, token-optimized output — reducing agent token consumption by 60-90%. When enabled, rtk is built from source at image build time using a musl-native Rust toolchain. It adds zero image size overhead when disabled.
@@ -186,6 +197,42 @@ exitbox agents config claude   # Open agent config in $EDITOR
 ```
 
 > **Note:** RTK is experimental. If you encounter issues, disable it via `exitbox setup` and rebuild with `exitbox run <agent> --update`.
+
+### Agent Skills
+
+Skills are reusable SKILL.md files that give agents specialized capabilities (coding conventions, deploy workflows, review checklists, etc.). ExitBox provides a universal skill installer that works across all agents. Skills are installed once per workspace and automatically linked into each agent's skill directory at container start.
+
+```bash
+# Install from a GitHub directory (fetches all files recursively)
+exitbox skills install https://github.com/anthropics/skills/tree/main/skills/frontend-design
+
+# Install from a raw URL
+exitbox skills install https://example.com/path/to/SKILL.md
+
+# Install from a local directory or file
+exitbox skills install ./my-skill/
+exitbox skills install ./deploy/SKILL.md
+
+# Override the skill name
+exitbox skills install https://github.com/user/repo/tree/main/skills/foo --name my-custom-name
+
+# Install into a specific workspace
+exitbox skills install ./my-skill -w work
+
+# List and remove
+exitbox skills list
+exitbox skills remove frontend-design
+```
+
+Skills are stored at `~/.config/exitbox/profiles/global/<workspace>/skills/<name>/`. On container start, ExitBox symlinks each skill into the active agent's native skill path:
+
+| Agent    | Skill path inside container              |
+|:---------|:-----------------------------------------|
+| Claude   | `~/.claude/skills/<name>/SKILL.md`       |
+| Codex    | `~/.agents/skills/<name>/SKILL.md`       |
+| OpenCode | `~/.config/opencode/skills/<name>/SKILL.md` |
+
+All three agents use the same [Agent Skills](https://agentskills.io) SKILL.md format with YAML frontmatter, so a single skill works across agents.
 
 ### Named Resumable Sessions
 
@@ -373,6 +420,9 @@ exitbox agents list       # List enabled agents and their status
 exitbox agents config <agent>  # Open agent config in $EDITOR
 exitbox config import <agent|all>  # Import agent config from host
 exitbox config edit <agent>        # Open agent config file in $EDITOR
+exitbox skills install <source>    # Install a skill from URL/path
+exitbox skills list                # List installed skills
+exitbox skills remove <name>       # Remove an installed skill
 ```
 
 ### Config Generation

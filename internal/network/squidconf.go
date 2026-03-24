@@ -56,8 +56,9 @@ acl localhost src 127.0.0.1/32
 `)
 	fmt.Fprintf(&b, "acl agent_sources src %s\n\n# Allowlist\n", subnet)
 
+	// Collect and deduplicate all entries.
 	seen := make(map[string]bool)
-	count := 0
+	var entries []string
 
 	for _, domain := range domains {
 		normalized, err := NormalizeAllowlistEntry(domain)
@@ -69,11 +70,9 @@ acl localhost src 127.0.0.1/32
 			continue
 		}
 		seen[normalized] = true
-		fmt.Fprintf(&b, "acl allowed_domains dstdomain %s\n", normalized)
-		count++
+		entries = append(entries, normalized)
 	}
 
-	// Extra URLs
 	for _, url := range extraURLs {
 		if url == "" {
 			continue
@@ -87,11 +86,19 @@ acl localhost src 127.0.0.1/32
 			continue
 		}
 		seen[normalized] = true
-		fmt.Fprintf(&b, "acl allowed_domains dstdomain %s\n", normalized)
-		count++
+		entries = append(entries, normalized)
 	}
 
-	if count == 0 {
+	// Remove subdomain entries covered by a parent domain.
+	// Squid FATAL-errors when e.g. ".www.icy-veins.com" and ".icy-veins.com"
+	// both appear (the subdomain is redundant).
+	entries = removeRedundantSubdomains(entries)
+
+	for _, e := range entries {
+		fmt.Fprintf(&b, "acl allowed_domains dstdomain %s\n", e)
+	}
+
+	if len(entries) == 0 {
 		ui.Warn("Allowlist is empty or invalid. Blocking all outbound destinations.")
 		b.WriteString("acl allowed_domains dstdomain .__agentbox_block_all__.invalid\n")
 	}
@@ -108,7 +115,41 @@ http_access deny all
 # Hide proxy info
 forwarded_for off
 via off
+
+# DNS caching — reduce latency for repeated lookups
+dns_nameservers 1.1.1.1 8.8.8.8
+positive_dns_ttl 5 minutes
+negative_dns_ttl 30 seconds
 `)
 
 	return b.String()
+}
+
+// removeRedundantSubdomains filters out entries that are subdomains of another
+// entry. E.g. if ".icy-veins.com" is present, ".www.icy-veins.com" is removed
+// since the parent already covers all subdomains in squid's dstdomain matching.
+func removeRedundantSubdomains(entries []string) []string {
+	var result []string
+	for _, e := range entries {
+		if !strings.HasPrefix(e, ".") {
+			// IPs, localhost — never redundant.
+			result = append(result, e)
+			continue
+		}
+		redundant := false
+		for _, other := range entries {
+			if other == e || !strings.HasPrefix(other, ".") {
+				continue
+			}
+			// e=".www.icy-veins.com" is covered by other=".icy-veins.com"
+			if strings.HasSuffix(e, other) && len(e) > len(other) {
+				redundant = true
+				break
+			}
+		}
+		if !redundant {
+			result = append(result, e)
+		}
+	}
+	return result
 }
