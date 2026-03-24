@@ -89,6 +89,11 @@ RUN if [ "$INSTALL_RTK" = "true" ]; then \
         apk del musl-dev gcc; \
     fi
 
+# Stub xdg-open: no browser in container, just print the URL so OAuth
+# flows (OpenCode, Codex) show the link instead of failing with ENOENT.
+RUN printf '#!/bin/sh\necho "Open this URL in your browser:"\necho "$1"\n' \
+    > /usr/local/bin/xdg-open && chmod +x /usr/local/bin/xdg-open
+
 # Copy entrypoint
 COPY docker-entrypoint /usr/local/bin/docker-entrypoint
 RUN chmod +x /usr/local/bin/docker-entrypoint
