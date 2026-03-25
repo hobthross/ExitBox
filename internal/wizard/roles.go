@@ -78,8 +78,8 @@ var Roles = []Role{
 	{
 		Name:           "Fullstack",
 		Description:    "Full-stack web development",
-		Profiles:       []string{"node", "python", "database", "web", "build-tools"},
-		Languages:      []string{"Node/JS", "Python"},
+		Profiles:       []string{"node", "python", "database", "web", "dotnet", "build-tools"},
+		Languages:      []string{"Node/JS", "Python", ".NET"},
 		ToolCategories: []string{"Build Tools", "Database", "Web"},
 	},
 	{
@@ -133,6 +133,7 @@ var AllLanguages = []Language{
 	{Name: "Node/JS", Profile: "node"},
 	{Name: "Rust", Profile: "rust"},
 	{Name: "Java", Profile: "java"},
+	{Name: ".NET", Profile: "dotnet"},
 	{Name: "Ruby", Profile: "ruby"},
 	{Name: "PHP", Profile: "php"},
 	{Name: "C/C++", Profile: "c"},

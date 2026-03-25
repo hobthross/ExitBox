@@ -33,6 +33,7 @@ import (
 	"github.com/cloud-exit/exitbox/internal/generate"
 	"github.com/cloud-exit/exitbox/internal/ipc"
 	"github.com/cloud-exit/exitbox/internal/network"
+	"github.com/cloud-exit/exitbox/internal/platform"
 	"github.com/cloud-exit/exitbox/internal/profile"
 	"github.com/cloud-exit/exitbox/internal/project"
 	"github.com/cloud-exit/exitbox/internal/redactor"
@@ -264,8 +265,9 @@ func AgentContainer(rt container.Runtime, opts Options) (int, error) {
 	}
 	args = append(args, "-w", "/workspace", "-v", opts.ProjectDir+":/workspace"+mountMode)
 
-	// Non-root
-	args = append(args, "--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()))
+	// Non-root (Windows: os.Getuid/Getgid are -1)
+	runUID, runGID := platform.HostUIDGID()
+	args = append(args, "--user", fmt.Sprintf("%d:%d", runUID, runGID))
 
 	// Include dirs
 	for _, dir := range opts.IncludeDirs {

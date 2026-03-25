@@ -17,7 +17,25 @@
 // Package platform provides OS and architecture detection.
 package platform
 
-import "runtime"
+import (
+	"os"
+	"runtime"
+)
+
+const (
+	DefaultContainerUID = 1000
+	DefaultContainerGID = 1000
+)
+
+// HostUIDGID returns host user and group IDs for Docker build args.
+// On Windows it returns -1 and in this case returns DefaultContainerUID:DefaultContainerGID
+func HostUIDGID() (uid, gid int) {
+	uid, gid = os.Getuid(), os.Getgid()
+	if uid < 0 || gid < 0 {
+		return DefaultContainerUID, DefaultContainerGID
+	}
+	return uid, gid
+}
 
 // DetectOS returns the current operating system as a normalized string.
 func DetectOS() string {
