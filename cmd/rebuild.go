@@ -20,7 +20,7 @@ import (
 	"context"
 	"os"
 
-	"github.com/cloud-exit/exitbox/internal/agent"
+	"github.com/cloud-exit/exitbox/internal/agents"
 	"github.com/cloud-exit/exitbox/internal/config"
 	"github.com/cloud-exit/exitbox/internal/container"
 	"github.com/cloud-exit/exitbox/internal/image"
@@ -62,45 +62,52 @@ Examples:
 
 		cfg := config.LoadOrDefault()
 
-		var agents []string
+		var agentNames []string
 		if name == "all" {
-			for _, a := range agent.AgentNames {
-				if cfg.IsAgentEnabled(a) {
-					agents = append(agents, a)
+			for _, a := range agents.All() {
+				if cfg.IsAgentEnabled(a.Name()) {
+					agentNames = append(agentNames, a.Name())
 				}
 			}
-			if len(agents) == 0 {
+			if len(agentNames) == 0 {
 				ui.Error("No agents are enabled. Run 'exitbox setup' first.")
 			}
 		} else {
-			if !agent.IsValidAgent(name) {
+			agt := agents.Get(name)
+			if agt == nil {
 				ui.Errorf("Unknown agent: %s", name)
 			}
-			agents = []string{name}
+			agentNames = []string{agt.Name()}
 		}
 
 		projectDir, _ := os.Getwd()
 		ctx := context.Background()
 
-		for _, a := range agents {
-			ui.Infof("Rebuilding %s container image...", agent.DisplayName(a))
+		for _, agentName := range agentNames {
+			a := agents.Get(agentName)
+			ui.Infof("Rebuilding %s container image...", a.DisplayName())
 			version := rebuildVersion
 			if version == "" {
-				version = cfg.GetAgentVersion(a)
+				version = cfg.GetAgentVersion(agentName)
 			}
 			if version != "" {
-				ui.Infof("Pinning %s to version %s", agent.DisplayName(a), version)
+				ui.Infof("Pinning %s to version %s", a.DisplayName(), version)
 				image.AutoUpdate = false // don't fetch latest when version is pinned
 			}
 			// Set AgentVersion so BuildTools -> BuildCore also uses the pin
 			image.AgentVersion = version
-			if err := image.BuildCore(ctx, rt, a, true, version); err != nil {
-				ui.Errorf("Failed to rebuild %s core image: %v", agent.DisplayName(a), err)
+			if err := image.BuildCore(ctx, rt, agentName, true, version); err != nil {
+				ui.Errorf("Failed to rebuild %s core image: %v", a.DisplayName(), err)
 			}
-			if err := image.BuildProject(ctx, rt, a, projectDir, rebuildWorkspace, true); err != nil {
-				ui.Errorf("Failed to rebuild %s project image: %v", agent.DisplayName(a), err)
+
+			ui.Infof("Rebuilding %s container image...", a.DisplayName())
+			if err := image.BuildCore(ctx, rt, agentName, true, version); err != nil {
+				ui.Errorf("Failed to rebuild %s core image: %v", a.DisplayName(), err)
 			}
-			ui.Successf("%s image rebuilt successfully", agent.DisplayName(a))
+			if err := image.BuildProject(ctx, rt, agentName, projectDir, rebuildWorkspace, true); err != nil {
+				ui.Errorf("Failed to rebuild %s project image: %v", a.DisplayName(), err)
+			}
+			ui.Successf("%s image rebuilt successfully", a.DisplayName())
 		}
 	},
 }

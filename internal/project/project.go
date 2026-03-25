@@ -24,6 +24,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/cloud-exit/exitbox/internal/agents"
 	"github.com/cloud-exit/exitbox/internal/config"
 )
 
@@ -70,8 +71,8 @@ func Init(path string) error {
 	}
 
 	// Create per-agent directories
-	for _, agent := range []string{"claude", "codex", "opencode"} {
-		if err := os.MkdirAll(filepath.Join(parent, agent), 0755); err != nil {
+	for _, agentName := range agents.Names() {
+		if err := os.MkdirAll(filepath.Join(parent, agentName), 0755); err != nil {
 			return err
 		}
 	}

@@ -20,6 +20,8 @@ package wizard
 import (
 	"os"
 	"path/filepath"
+
+	"github.com/cloud-exit/exitbox/internal/agents"
 )
 
 // Role represents a developer role with preset defaults.
@@ -178,11 +180,20 @@ var AllExternalTools = []ExternalTool{
 	},
 }
 
-// AllAgents defines the selectable agents.
-var AllAgents = []AgentOption{
-	{Name: "claude", DisplayName: "Claude Code", Description: "Anthropic's AI coding assistant"},
-	{Name: "codex", DisplayName: "OpenAI Codex", Description: "OpenAI's coding CLI"},
-	{Name: "opencode", DisplayName: "OpenCode", Description: "Open-source AI code assistant"},
+// AllAgents defines the selectable agents, built from the agent registry.
+var AllAgents = buildAllAgentOptions()
+
+func buildAllAgentOptions() []AgentOption {
+	list := agents.All()
+	out := make([]AgentOption, 0, len(list))
+	for _, a := range list {
+		out = append(out, AgentOption{
+			Name:        a.Name(),
+			DisplayName: a.DisplayName(),
+			Description: a.Description(),
+		})
+	}
+	return out
 }
 
 // GetRole returns the role by name, or nil.

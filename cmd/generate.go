@@ -23,6 +23,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/cloud-exit/exitbox/internal/agents"
 	"github.com/cloud-exit/exitbox/internal/config"
 	"github.com/cloud-exit/exitbox/internal/generate"
 	"github.com/cloud-exit/exitbox/internal/profile"
@@ -46,9 +47,9 @@ Examples:
   exitbox generate codex                 Configure Codex for a custom provider`,
 	}
 
-	cmd.AddCommand(newGenerateAgentCmd("opencode", "OpenCode"))
-	cmd.AddCommand(newGenerateAgentCmd("claude", "Claude Code"))
-	cmd.AddCommand(newGenerateAgentCmd("codex", "Codex"))
+	for _, agt := range agents.All() {
+		cmd.AddCommand(newGenerateAgentCmd(agt.Name(), agt.DisplayName()))
+	}
 	return cmd
 }
 
@@ -148,7 +149,7 @@ func runGenerate(agentName, displayName, workspaceFlag string) {
 	providerID := promptString("Provider ID (slug)", defaultSlug)
 
 	// Build server config.
-	serverCfg := generate.ServerConfig{
+	serverCfg := config.ServerConfig{
 		ProviderID:   providerID,
 		ProviderName: providerName,
 		BaseURL:      baseURL,
@@ -164,15 +165,12 @@ func runGenerate(agentName, displayName, workspaceFlag string) {
 	}
 
 	// Generate agent-specific config.
-	var configData map[string]interface{}
-	switch agentName {
-	case "opencode":
-		configData = generate.GenerateOpenCode(serverCfg)
-	case "claude":
-		configData = generate.GenerateClaude(serverCfg)
-	case "codex":
-		configData = generate.GenerateCodex(serverCfg)
+	agt := agents.Get(agentName)
+	if agt == nil {
+		ui.Errorf("Unknown agent: %s", agentName)
+		return
 	}
+	configData, _ := agt.GenerateConfig(serverCfg)
 
 	// Ensure agent config directory exists.
 	if err := profile.EnsureAgentConfig(workspaceName, agentName); err != nil {
@@ -181,11 +179,7 @@ func runGenerate(agentName, displayName, workspaceFlag string) {
 
 	// Write config.
 	agentDir := profile.WorkspaceAgentDir(workspaceName, agentName)
-	configPath := generate.ConfigPath(agentDir, agentName)
-	if configPath == "" {
-		ui.Errorf("Unknown agent: %s", agentName)
-	}
-
+	configPath := agt.ConfigFilePath(agentDir)
 	if err := generate.WriteConfig(configPath, configData); err != nil {
 		ui.Errorf("Failed to write config: %v", err)
 	}

@@ -17,6 +17,9 @@
 package agent
 
 import (
+	"context"
+
+	"github.com/cloud-exit/exitbox/internal/config"
 	"github.com/cloud-exit/exitbox/internal/container"
 )
 
@@ -26,63 +29,47 @@ type Mount struct {
 	Target string
 }
 
-// Agent is the interface that all agent implementations must satisfy.
+// PrepareBuildInput holds parameters for preparing an agent's Docker build context.
+// It is passed to Agent.PrepareBuild to support download, checksum, and logging.
+type PrepareBuildInput struct {
+	Ctx            context.Context
+	Version        string
+	BuildDir       string
+	DockerfilePath string
+	Download       func(ctx context.Context, url, dest string) error
+	FileSHA256     func(path string) string
+	Logf           func(format string, args ...interface{})
+}
+
 type Agent interface {
 	Name() string
 	DisplayName() string
+	Description() string
+
 	GetLatestVersion() (string, error)
 	GetInstalledVersion(rt container.Runtime, img string) (string, error)
+
 	GetDockerfileInstall(buildCtx string) (string, error)
 	GetFullDockerfile(version string) (string, error)
+
 	HostConfigPaths() []string
 	ContainerMounts(cfgDir string) []Mount
 	DetectHostConfig() (string, error)
 	ImportConfig(src, dst string) error
+
+	GenerateConfig(cfg config.ServerConfig) (map[string]interface{}, error)
+	LogSearchDirs(home, agentCfgDir string) []string
+
+	// PrepareBuild prepares the build context (downloads binaries, writes Dockerfile) for the agent's core image.
+	PrepareBuild(in PrepareBuildInput) error
+
+	// EnsureWorkspaceAgentConfig creates and seeds agent config dirs for the given workspace.
+	EnsureWorkspaceAgentConfig(workspaceName string) error
+
+	OllamaEnvVars(ollamaBaseURL string) []string
+	ConfigFilePath(agentDir string) string
+	// ExtractConfigServerURLs returns server URLs from parsed agent config JSON.
+	ExtractConfigServerURLs(data map[string]interface{}) []string
+
 	ImportFile(src, dst string) error
-	ConfigFilePath(wsDir string) string
-}
-
-// AgentNames is the list of all supported agent names.
-var AgentNames = []string{"claude", "codex", "opencode"}
-
-// DisplayName returns the human-readable name for an agent.
-func DisplayName(name string) string {
-	switch name {
-	case "claude":
-		return "Claude Code"
-	case "codex":
-		return "OpenAI Codex"
-	case "opencode":
-		return "OpenCode"
-	}
-	return name
-}
-
-// IsValidAgent returns true if the name is a known agent.
-func IsValidAgent(name string) bool {
-	for _, a := range AgentNames {
-		if a == name {
-			return true
-		}
-	}
-	return false
-}
-
-// registry holds all agent implementations.
-var registry = map[string]Agent{}
-
-// Register adds an agent to the registry.
-func Register(a Agent) {
-	registry[a.Name()] = a
-}
-
-// Get returns the agent implementation for a name.
-func Get(name string) Agent {
-	return registry[name]
-}
-
-func init() {
-	Register(&Claude{})
-	Register(&Codex{})
-	Register(&OpenCode{})
 }

@@ -25,6 +25,7 @@ agent_display_name() {
         claude)   echo "Claude Code" ;;
         codex)    echo "OpenAI Codex" ;;
         opencode) echo "OpenCode" ;;
+        qwen)     echo "Qwen Code" ;;
         *)        echo "$1" ;;
     esac
 }
@@ -163,6 +164,8 @@ agents:
   codex:
     enabled: true
   opencode:
+    enabled: true
+  qwen:
     enabled: true
 tools:
   user: []

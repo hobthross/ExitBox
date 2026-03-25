@@ -22,7 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/cloud-exit/exitbox/internal/agent"
+	"github.com/cloud-exit/exitbox/internal/agents"
 	"github.com/cloud-exit/exitbox/internal/config"
 	"github.com/cloud-exit/exitbox/internal/profile"
 	"github.com/cloud-exit/exitbox/internal/ui"
@@ -76,14 +76,15 @@ Examples:
 				}
 			}
 
-			var agents []string
+			var agentNames []string
 			if target == "all" {
-				agents = agent.AgentNames
+				agentNames = agents.Names()
 			} else {
-				if !agent.IsValidAgent(target) {
+				a := agents.Get(target)
+				if a == nil {
 					ui.Errorf("Unknown agent: %s", target)
 				}
-				agents = []string{target}
+				agentNames = []string{target}
 			}
 
 			// Resolve target workspace.
@@ -91,8 +92,8 @@ Examples:
 			workspaceName := resolveConfigWorkspace(cfg, workspace)
 
 			importedAny := false
-			for _, name := range agents {
-				a := agent.Get(name)
+			for _, name := range agentNames {
+				a := agents.Get(name)
 				if a == nil {
 					continue
 				}
@@ -161,13 +162,9 @@ Examples:
 		Args: cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			name := args[0]
-			if !agent.IsValidAgent(name) {
-				ui.Errorf("Unknown agent: %s", name)
-			}
-
-			a := agent.Get(name)
+			a := agents.Get(name)
 			if a == nil {
-				ui.Errorf("Agent not found: %s", name)
+				ui.Errorf("Unknown agent: %s", name)
 			}
 
 			cfg := config.LoadOrDefault()

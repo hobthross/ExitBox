@@ -57,6 +57,7 @@ func DefaultConfig() *Config {
 			Claude:   AgentEntry{Enabled: false},
 			Codex:    AgentEntry{Enabled: false},
 			OpenCode: AgentEntry{Enabled: false},
+			Qwen:     AgentEntry{Enabled: false},
 		},
 		Settings: SettingsConfig{
 			AutoUpdate:       false,
@@ -77,6 +78,7 @@ func DefaultAllowlist() *Allowlist {
 		Version: 1,
 		AIProviders: []string{
 			"anthropic.com",
+			"qwen.ai",
 			"claude.ai",
 			"claude.com",
 			"openai.com",

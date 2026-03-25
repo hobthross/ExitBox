@@ -22,7 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/cloud-exit/exitbox/internal/agent"
+	"github.com/cloud-exit/exitbox/internal/agents"
 	"github.com/cloud-exit/exitbox/internal/config"
 	"github.com/cloud-exit/exitbox/internal/profile"
 	"github.com/cloud-exit/exitbox/internal/session"
@@ -94,10 +94,10 @@ func newSessionsListCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&workspaceOverride, "workspace", "w", "", "Workspace to inspect (defaults to resolved active workspace)")
-	cmd.Flags().StringVar(&agentFilter, "agent", "all", "Agent filter: claude|codex|opencode|all")
+	cmd.Flags().StringVar(&agentFilter, "agent", "all", "Agent filter: claude|codex|opencode|qwen|all")
 	_ = cmd.RegisterFlagCompletionFunc("workspace", completeWorkspaceFlagValues)
 	_ = cmd.RegisterFlagCompletionFunc("agent", func(_ *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		candidates := []string{"all", "claude", "codex", "opencode"}
+		candidates := agents.Names("all")
 		var out []string
 		for _, c := range candidates {
 			if strings.HasPrefix(c, toComplete) {
@@ -171,7 +171,7 @@ func newSessionsRemoveCmd() *cobra.Command {
 	cmd.Flags().StringVar(&agentFilter, "agent", "all", "Agent filter: claude|codex|opencode|all")
 	_ = cmd.RegisterFlagCompletionFunc("workspace", completeWorkspaceFlagValues)
 	_ = cmd.RegisterFlagCompletionFunc("agent", func(_ *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		candidates := []string{"all", "claude", "codex", "opencode"}
+		candidates := agents.Names("all")
 		var out []string
 		for _, c := range candidates {
 			if strings.HasPrefix(c, toComplete) {
@@ -205,9 +205,11 @@ func resolveSessionsWorkspace(cfg *config.Config, projectDir, workspaceOverride 
 func resolveSessionAgents(filter string) ([]string, error) {
 	filter = strings.TrimSpace(filter)
 	if filter == "" || filter == "all" {
-		return agent.AgentNames, nil
+		return agents.Names(), nil
 	}
-	if !agent.IsValidAgent(filter) {
+
+	agt := agents.Get(filter)
+	if agt == nil {
 		return nil, fmt.Errorf("unknown agent '%s'. Expected one of: claude, codex, opencode, all", filter)
 	}
 	return []string{filter}, nil

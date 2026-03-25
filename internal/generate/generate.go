@@ -25,19 +25,9 @@ import (
 	"os"
 	"path/filepath"
 	"time"
-)
 
-// ServerConfig holds the user-provided server configuration.
-type ServerConfig struct {
-	ProviderID   string // slug, e.g. "local"
-	ProviderName string // display name, e.g. "Qwen3.5-397B (local)"
-	BaseURL      string // e.g. "http://localhost:8080/v1"
-	APIKey       string // may be empty or vault reference
-	ModelID      string // e.g. "qwen3.5-397b"
-	ModelName    string // e.g. "Qwen3.5-397B-A17B"
-	VaultKeyName string // non-empty when key is stored in vault
-	Compaction   bool   // OpenCode: enable auto compaction with pruning
-}
+	"github.com/cloud-exit/exitbox/internal/agents"
+)
 
 // ModelInfo describes a model returned by the /models endpoint.
 type ModelInfo struct {
@@ -83,55 +73,6 @@ func TestServer(baseURL, apiKey string) ([]ModelInfo, error) {
 	}
 
 	return result.Data, nil
-}
-
-// GenerateOpenCode produces an OpenCode config map.
-func GenerateOpenCode(cfg ServerConfig) map[string]interface{} {
-	result := map[string]interface{}{
-		"$schema": "https://opencode.ai/config.json",
-		"provider": map[string]interface{}{
-			cfg.ProviderID: map[string]interface{}{
-				"npm":  "@ai-sdk/openai-compatible",
-				"name": cfg.ProviderName,
-				"options": map[string]interface{}{
-					"baseURL": cfg.BaseURL,
-				},
-				"models": map[string]interface{}{
-					cfg.ModelID: map[string]interface{}{
-						"name": cfg.ModelName,
-					},
-				},
-			},
-		},
-		"model": cfg.ProviderID + "/" + cfg.ModelID,
-	}
-	if cfg.Compaction {
-		result["compaction"] = map[string]interface{}{
-			"auto":  true,
-			"prune": true,
-		}
-	}
-	return result
-}
-
-// GenerateClaude produces a Claude Code settings.json config map.
-func GenerateClaude(cfg ServerConfig) map[string]interface{} {
-	m := map[string]interface{}{
-		"apiBaseUrl": cfg.BaseURL,
-		"model":      cfg.ModelID,
-	}
-	if cfg.APIKey != "" && cfg.VaultKeyName == "" {
-		m["apiKey"] = cfg.APIKey
-	}
-	return m
-}
-
-// GenerateCodex produces a Codex config.json config map.
-func GenerateCodex(cfg ServerConfig) map[string]interface{} {
-	return map[string]interface{}{
-		"model":    cfg.ProviderID + "/" + cfg.ModelID,
-		"provider": cfg.BaseURL,
-	}
 }
 
 // MergeJSON deep-merges generated values into existing, returning a new map.
@@ -192,27 +133,14 @@ func WriteConfig(path string, data map[string]interface{}) error {
 	return os.WriteFile(path, out, 0644)
 }
 
-// ConfigPath returns the config file path for an agent within a workspace profile dir.
-func ConfigPath(agentDir, agentName string) string {
-	switch agentName {
-	case "opencode":
-		return filepath.Join(agentDir, ".config", "opencode", "opencode.json")
-	case "claude":
-		return filepath.Join(agentDir, ".claude", "settings.json")
-	case "codex":
-		return filepath.Join(agentDir, ".codex", "config.json")
-	}
-	return ""
-}
-
 // ExtractConfigHosts reads the agent config file and extracts any non-local
 // server hosts (with port) that the agent is configured to connect to.
 func ExtractConfigHosts(agentDir, agentName string) []string {
-	path := ConfigPath(agentDir, agentName)
-	if path == "" {
+	agt := agents.Get(agentName)
+	if agt == nil {
 		return nil
 	}
-
+	path := agt.ConfigFilePath(agentDir)
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return nil
@@ -223,56 +151,9 @@ func ExtractConfigHosts(agentDir, agentName string) []string {
 		return nil
 	}
 
-	var urls []string
-	switch agentName {
-	case "opencode":
-		urls = extractOpenCodeURLs(data)
-	case "claude":
-		urls = extractClaudeURLs(data)
-	case "codex":
-		urls = extractCodexURLs(data)
-	}
+	urls := agt.ExtractConfigServerURLs(data)
 
 	return deduplicateHosts(urls)
-}
-
-// extractOpenCodeURLs walks provider.*.options.baseURL in an OpenCode config.
-func extractOpenCodeURLs(data map[string]interface{}) []string {
-	providers, ok := data["provider"].(map[string]interface{})
-	if !ok {
-		return nil
-	}
-	var urls []string
-	for _, pv := range providers {
-		provider, ok := pv.(map[string]interface{})
-		if !ok {
-			continue
-		}
-		opts, ok := provider["options"].(map[string]interface{})
-		if !ok {
-			continue
-		}
-		if baseURL, ok := opts["baseURL"].(string); ok && baseURL != "" {
-			urls = append(urls, baseURL)
-		}
-	}
-	return urls
-}
-
-// extractClaudeURLs reads the top-level apiBaseUrl from a Claude config.
-func extractClaudeURLs(data map[string]interface{}) []string {
-	if baseURL, ok := data["apiBaseUrl"].(string); ok && baseURL != "" {
-		return []string{baseURL}
-	}
-	return nil
-}
-
-// extractCodexURLs reads the top-level provider URL from a Codex config.
-func extractCodexURLs(data map[string]interface{}) []string {
-	if provider, ok := data["provider"].(string); ok && provider != "" {
-		return []string{provider}
-	}
-	return nil
 }
 
 // deduplicateHosts extracts host:port from URLs and returns a unique list,

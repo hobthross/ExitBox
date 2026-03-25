@@ -19,7 +19,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/cloud-exit/exitbox/internal/agent"
+	"github.com/cloud-exit/exitbox/internal/agents"
 	"github.com/spf13/cobra"
 )
 
@@ -33,8 +33,8 @@ var aliasesCmd = &cobra.Command{
 		fmt.Println(`export PATH="$HOME/.local/bin:$PATH"`)
 		fmt.Println()
 		fmt.Println("# Agent aliases")
-		for _, name := range agent.AgentNames {
-			fmt.Printf("alias %s='exitbox run %s'\n", name, name)
+		for _, agt := range agents.All() {
+			fmt.Printf("alias %s='exitbox run %s'\n", agt.Name(), agt.Name())
 		}
 	},
 }

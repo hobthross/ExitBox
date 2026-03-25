@@ -27,6 +27,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/cloud-exit/exitbox/internal/agents"
 	"github.com/cloud-exit/exitbox/internal/config"
 	"github.com/cloud-exit/exitbox/internal/container"
 	"github.com/cloud-exit/exitbox/internal/generate"
@@ -474,25 +475,25 @@ func getEnvOr(key, def string) string {
 }
 
 // ollamaEnvVars returns the container env flags to point an agent at host Ollama.
-func ollamaEnvVars(agent string) []string {
-	ollamaURL := "http://host.docker.internal:11434"
-	switch agent {
-	case "claude":
-		return []string{
-			"-e", "ANTHROPIC_BASE_URL=" + ollamaURL,
-			"-e", "ANTHROPIC_AUTH_TOKEN=ollama",
-			"-e", "ANTHROPIC_API_KEY=",
-		}
-	case "codex":
-		return []string{
-			"-e", "OPENAI_BASE_URL=" + ollamaURL + "/v1",
-		}
-	case "opencode":
-		return []string{
-			"-e", "OLLAMA_HOST=" + ollamaURL,
-		}
+func ollamaEnvVars(agentName string) []string {
+	const ollamaURL = "http://host.docker.internal:11434"
+
+	a := agents.Get(agentName)
+	if a == nil {
+		return nil
 	}
-	return nil
+
+	envPairs := a.OllamaEnvVars(ollamaURL)
+	if len(envPairs) == 0 {
+		return nil
+	}
+
+	out := make([]string, 0, len(envPairs)*2)
+	for _, ev := range envPairs {
+		// ev is expected to be "KEY=VALUE"
+		out = append(out, "-e", ev)
+	}
+	return out
 }
 
 // redactorWriter wraps an io.Writer and filters output through a redactor.
@@ -537,7 +538,7 @@ func isReservedEnvVar(key string) bool {
 		"HTTPS_PROXY":             true,
 		"no_proxy":                true,
 		"NO_PROXY":                true,
-		"SSH_AUTH_SOCK":            true,
+		"SSH_AUTH_SOCK":           true,
 	}
 	return reserved[key]
 }
