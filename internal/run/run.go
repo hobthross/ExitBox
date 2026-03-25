@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -149,7 +150,7 @@ func AgentContainer(rt container.Runtime, opts Options) (int, error) {
 	// Network setup
 	if opts.NoFirewall {
 		// Host networking gives unrestricted internet access and exposes
-		// all container ports directly (e.g. Codex OAuth on 1455).
+		// all container ports directly (e.g. OAuth callbacks).
 		args = append(args, "--network", "host")
 	} else {
 		network.EnsureNetworks(rt)
@@ -159,6 +160,21 @@ func AgentContainer(rt container.Runtime, opts Options) (int, error) {
 		}
 		proxyArgs := network.GetProxyEnvVars(rt)
 		args = append(args, proxyArgs...)
+
+		// Publish OAuth callback ports so browser redirects to localhost
+		// reach the agent inside the container. A socat relay in
+		// docker-entrypoint bridges 0.0.0.0:RELAY → 127.0.0.1:APP.
+		// Skip if the port is already in use (e.g. another exitbox session).
+		switch opts.Agent {
+		case "codex":
+			if portAvailable("127.0.0.1", 1455) {
+				args = append(args, "-p", "127.0.0.1:1455:2455")
+			}
+		case "opencode":
+			if portAvailable("127.0.0.1", 8085) {
+				args = append(args, "-p", "127.0.0.1:8085:2085")
+			}
+		}
 	}
 
 	// IPC server for runtime domain allow requests.
@@ -537,4 +553,14 @@ func isOllamaEnvVar(key string) bool {
 		return true
 	}
 	return false
+}
+
+// portAvailable returns true if the given TCP port can be bound.
+func portAvailable(host string, port int) bool {
+	ln, err := net.Listen("tcp", fmt.Sprintf("%s:%d", host, port))
+	if err != nil {
+		return false
+	}
+	_ = ln.Close()
+	return true
 }

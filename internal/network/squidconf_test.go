@@ -75,6 +75,26 @@ func TestGenerateSquidConfig_DeduplicationAcrossLists(t *testing.T) {
 	}
 }
 
+func TestGenerateSquidConfig_SubdomainDedup(t *testing.T) {
+	// ".www.icy-veins.com" is a subdomain of ".icy-veins.com" — squid FATAL-errors
+	// if both are present. The generator must remove the redundant subdomain.
+	domains := []string{"icy-veins.com", "www.icy-veins.com", "githubusercontent.com", "raw.githubusercontent.com"}
+	conf := GenerateSquidConfig("10.89.0.0/24", domains, nil)
+
+	if strings.Contains(conf, ".www.icy-veins.com") {
+		t.Error("config should not contain .www.icy-veins.com (subdomain of .icy-veins.com)")
+	}
+	if !strings.Contains(conf, ".icy-veins.com") {
+		t.Error("config should contain .icy-veins.com")
+	}
+	if strings.Contains(conf, ".raw.githubusercontent.com") {
+		t.Error("config should not contain .raw.githubusercontent.com (subdomain of .githubusercontent.com)")
+	}
+	if !strings.Contains(conf, ".githubusercontent.com") {
+		t.Error("config should contain .githubusercontent.com")
+	}
+}
+
 func TestGenerateSquidConfig_EmptyAllowlist(t *testing.T) {
 	conf := GenerateSquidConfig("10.89.0.0/24", nil, nil)
 
