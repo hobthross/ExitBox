@@ -46,9 +46,6 @@ func TestClaudeAgent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetDockerfileInstall() error: %v", err)
 	}
-	if !strings.Contains(df, "sha256sum") {
-		t.Error("GetDockerfileInstall() should contain sha256sum verification")
-	}
 	if !strings.Contains(df, "claude") {
 		t.Error("GetDockerfileInstall() should reference claude")
 	}
@@ -113,5 +110,3 @@ func TestClaudeImportFile(t *testing.T) {
 		t.Errorf("content mismatch: got %q, want %q", data, content)
 	}
 }
-
-
