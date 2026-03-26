@@ -27,6 +27,7 @@ import (
 
 	"github.com/cloud-exit/exitbox/internal/config"
 	"github.com/cloud-exit/exitbox/internal/container"
+	"github.com/cloud-exit/exitbox/internal/platform"
 	"github.com/cloud-exit/exitbox/internal/ui"
 	"github.com/cloud-exit/exitbox/static"
 )
@@ -242,11 +243,12 @@ func buildLocalIntermediary(ctx context.Context, rt container.Runtime, cmd, base
 		}
 	}
 
+	uid, gid := platform.HostUIDGID()
 	args := buildArgs(cmd)
 	args = append(args,
 		"--build-arg", fmt.Sprintf("BASE_IMAGE=%s", baseRef),
-		"--build-arg", fmt.Sprintf("USER_ID=%d", os.Getuid()),
-		"--build-arg", fmt.Sprintf("GROUP_ID=%d", os.Getgid()),
+		"--build-arg", fmt.Sprintf("USER_ID=%d", uid),
+		"--build-arg", fmt.Sprintf("GROUP_ID=%d", gid),
 		"--build-arg", "USERNAME=user",
 		"-t", imageName,
 		"-f", dockerfilePath,

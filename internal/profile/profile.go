@@ -38,6 +38,7 @@ func All() []Profile {
 		{"rust", "Rust toolchain (rust + cargo via apk)", "rust cargo"},
 		{"go", "Go runtime (latest stable for host arch, checksum verified)", ""},
 		{"java", "OpenJDK with Maven and Gradle", "openjdk17-jdk maven gradle"},
+		{"dotnet", ".NET 8 SDK (dotnet CLI)", "dotnet8-sdk"},
 		{"ruby", "Ruby runtime with bundler", "ruby ruby-dev readline-dev yaml-dev sqlite-dev sqlite libxml2-dev libxslt-dev curl-dev"},
 		{"php", "PHP runtime with composer", "php83 php83-cli php83-fpm php83-mysqli php83-pgsql php83-sqlite3 php83-curl php83-gd php83-mbstring php83-xml php83-zip composer"},
 		{"database", "Database CLI clients (Postgres, MySQL/MariaDB, SQLite, Redis)", "postgresql16-client mariadb-client sqlite redis"},
