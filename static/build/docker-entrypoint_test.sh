@@ -78,29 +78,41 @@ CAPTURE_FUNC="$(extract_func capture_resume_token)"
 BUILD_FUNC="$(extract_func build_resume_args)"
 DISPLAY_FUNC="$(extract_func agent_display_name)"
 TMUX_CONF_FUNC="$(extract_func write_tmux_conf)"
+LINK_PATH_FUNC="$(extract_func link_path)"
 DEFAULT_SESSION_NAME_FUNC="$(extract_func default_session_name)"
 CURRENT_SESSION_NAME_FUNC="$(extract_func current_session_name)"
 EFFECTIVE_SESSION_NAME_FUNC="$(extract_func effective_session_name)"
 PROJECT_RESUME_DIR_FUNC="$(extract_func project_resume_dir)"
 ACTIVE_SESSION_FILE_FUNC="$(extract_func active_session_file)"
+KV_SESSION_PREFIX_FUNC="$(extract_func kv_session_prefix)"
 SET_ACTIVE_SESSION_NAME_FUNC="$(extract_func set_active_session_name)"
 GET_ACTIVE_SESSION_NAME_FUNC="$(extract_func get_active_session_name)"
 SESSION_KEY_FOR_NAME_FUNC="$(extract_func session_key_for_name)"
 SESSION_DIR_FOR_NAME_FUNC="$(extract_func session_dir_for_name)"
 ENSURE_NAMED_SESSION_DIR_FUNC="$(extract_func ensure_named_session_dir)"
 LEGACY_RESUME_FILE_FUNC="$(extract_func legacy_resume_file)"
+CODEX_SESSION_STORAGE_NAME_FUNC="$(extract_func codex_session_storage_name)"
+CODEX_USES_DIRECT_HOME_FUNC="$(extract_func codex_uses_direct_home)"
+CONFIGURE_CODEX_SESSION_STORAGE_FUNC="$(extract_func configure_codex_session_storage)"
 
 SESSION_HELPER_FUNCS="${DEFAULT_SESSION_NAME_FUNC}
 ${CURRENT_SESSION_NAME_FUNC}
 ${EFFECTIVE_SESSION_NAME_FUNC}
 ${PROJECT_RESUME_DIR_FUNC}
 ${ACTIVE_SESSION_FILE_FUNC}
+${KV_SESSION_PREFIX_FUNC}
 ${SET_ACTIVE_SESSION_NAME_FUNC}
 ${GET_ACTIVE_SESSION_NAME_FUNC}
 ${SESSION_KEY_FOR_NAME_FUNC}
 ${SESSION_DIR_FOR_NAME_FUNC}
 ${ENSURE_NAMED_SESSION_DIR_FUNC}
-${LEGACY_RESUME_FILE_FUNC}"
+${LEGACY_RESUME_FILE_FUNC}
+${CODEX_USES_DIRECT_HOME_FUNC}"
+
+CODEX_SESSION_HELPERS="${LINK_PATH_FUNC}
+${SESSION_HELPER_FUNCS}
+${CODEX_SESSION_STORAGE_NAME_FUNC}
+${CONFIGURE_CODEX_SESSION_STORAGE_FUNC}"
 
 session_key_for_test() {
     local name="$1"
@@ -521,6 +533,120 @@ test_build_resume_args_project_scoped_reads_scoped_token() {
 }
 
 # ============================================================================
+# Test: configure_codex_session_storage isolates named sessions
+# ============================================================================
+test_configure_codex_session_storage_isolates_named_sessions() {
+    local tmpdir="$TEST_TMPDIR/codex_storage_named"
+    local home="$tmpdir/home"
+    local shared="$tmpdir/shared-codex"
+    local session_name="infra"
+    local session_key
+    session_key="$(session_key_for_test "$session_name")"
+
+    mkdir -p "$home" "$shared/sessions/legacy"
+    echo "model = \"gpt-5\"" > "$shared/config.toml"
+    ln -s "$shared" "$home/.codex"
+
+    local result
+    result="$(
+        AGENT="codex"
+        HOME="$home"
+        EXITBOX_SESSION_NAME="$session_name"
+        eval "$CODEX_SESSION_HELPERS"
+        configure_codex_session_storage
+        printf 'codex=%s\n' "$(readlink -f "$HOME/.codex")"
+        printf 'config=%s\n' "$(readlink -f "$HOME/.codex/config.toml")"
+        printf 'sessions=%s\n' "$(readlink -f "$HOME/.codex/sessions")"
+    )" 2>/dev/null
+
+    assert_contains "configure_codex_session_storage (named overlay)" \
+        "$result" "codex=${shared}/.exitbox/session-home/${session_key}"
+    assert_contains "configure_codex_session_storage (shared config)" \
+        "$result" "config=${shared}/config.toml"
+    assert_contains "configure_codex_session_storage (isolated sessions)" \
+        "$result" "sessions=${shared}/.exitbox/session-data/${session_key}/sessions"
+}
+
+# ============================================================================
+# Test: configure_codex_session_storage uses active session for bare resume
+# ============================================================================
+test_configure_codex_session_storage_uses_active_session() {
+    local tmpdir="$TEST_TMPDIR/codex_storage_active"
+    local home="$tmpdir/home"
+    local shared="$tmpdir/shared-codex"
+    local active_name="exitmail"
+    local session_key
+    session_key="$(session_key_for_test "$active_name")"
+
+    mkdir -p "$home" "$shared" "$tmpdir/default/codex"
+    ln -s "$shared" "$home/.codex"
+    echo "$active_name" > "$tmpdir/default/codex/.active-session"
+
+    local result
+    result="$(
+        AGENT="codex"
+        HOME="$home"
+        GLOBAL_WORKSPACE_ROOT="$tmpdir"
+        EXITBOX_WORKSPACE_NAME="default"
+        EXITBOX_AUTO_RESUME="true"
+        EXITBOX_SESSION_NAME=""
+        eval "$CODEX_SESSION_HELPERS"
+        configure_codex_session_storage
+        printf 'session=%s\n' "$EXITBOX_SESSION_NAME"
+        printf 'sessions=%s\n' "$(readlink -f "$HOME/.codex/sessions")"
+    )" 2>/dev/null
+
+    assert_contains "configure_codex_session_storage (active session name)" \
+        "$result" "session=${active_name}"
+    assert_contains "configure_codex_session_storage (active session path)" \
+        "$result" "sessions=${shared}/.exitbox/session-data/${session_key}/sessions"
+}
+
+# ============================================================================
+# Test: configure_codex_session_storage bypasses overlay for login/logout flows
+# ============================================================================
+test_configure_codex_session_storage_bypasses_login_flow() {
+    local tmpdir="$TEST_TMPDIR/codex_storage_login"
+    local home="$tmpdir/home"
+    local shared="$tmpdir/shared-codex"
+
+    mkdir -p "$home" "$shared"
+    ln -s "$shared" "$home/.codex"
+
+    local result
+    result="$(
+        AGENT="codex"
+        HOME="$home"
+        EXITBOX_SESSION_NAME="login-run"
+        eval "$CODEX_SESSION_HELPERS"
+        configure_codex_session_storage login
+        printf 'codex=%s\n' "$(readlink -f "$HOME/.codex")"
+    )" 2>/dev/null
+
+    assert_contains "configure_codex_session_storage (login keeps shared home)" \
+        "$result" "codex=${shared}"
+}
+
+# ============================================================================
+# Test: build_resume_args does not inject resume flags into codex login
+# ============================================================================
+test_build_resume_args_skips_codex_login() {
+    local result
+    result="$(
+        AGENT="codex"
+        EXITBOX_AUTO_RESUME="true"
+        EXITBOX_RESUME_TOKEN="last"
+        eval "$SESSION_HELPER_FUNCS"
+        eval "$CODEX_USES_DIRECT_HOME_FUNC"
+        eval "$BUILD_FUNC"
+        build_resume_args login
+        echo "${RESUME_ARGS[*]}"
+    )" 2>/dev/null
+
+    assert_eq "build_resume_args (codex login has no resume args)" "" "$result"
+}
+
+# ============================================================================
 # Test: write_tmux_conf includes scrolling settings
 # ============================================================================
 test_write_tmux_conf_scroll_settings() {
@@ -634,6 +760,10 @@ test_capture_resume_token_project_scoped
 test_build_resume_args_named_session_no_legacy_fallback
 test_build_resume_args_active_session_legacy_fallback
 test_build_resume_args_project_scoped_reads_scoped_token
+test_configure_codex_session_storage_isolates_named_sessions
+test_configure_codex_session_storage_uses_active_session
+test_configure_codex_session_storage_bypasses_login_flow
+test_build_resume_args_skips_codex_login
 test_write_tmux_conf_scroll_settings
 test_parse_keybindings_default
 test_parse_keybindings_custom

@@ -28,7 +28,10 @@ import (
 	"time"
 )
 
-var githubTreeRE = regexp.MustCompile(`^https?://github\.com/([^/]+)/([^/]+)/tree/([^/]+)/(.+)$`)
+var (
+	githubTreeRE = regexp.MustCompile(`^https?://github\.com/([^/]+)/([^/]+)/tree/([^/]+)/(.+)$`)
+	githubBlobRE = regexp.MustCompile(`^https?://github\.com/([^/]+)/([^/]+)/blob/([^/]+)/(.+)$`)
+)
 
 // SourceType identifies the type of skill source.
 type SourceType int
@@ -36,6 +39,7 @@ type SourceType int
 const (
 	SourceUnknown    SourceType = iota
 	SourceGitHubTree            // GitHub tree URL (directory)
+	SourceGitHubBlob            // GitHub blob URL (single file)
 	SourceRawURL                // Direct URL to a file
 	SourceLocalPath             // Local filesystem path
 )
@@ -44,6 +48,9 @@ const (
 func DetectSource(input string) SourceType {
 	if githubTreeRE.MatchString(input) {
 		return SourceGitHubTree
+	}
+	if githubBlobRE.MatchString(input) {
+		return SourceGitHubBlob
 	}
 	if strings.HasPrefix(input, "http://") || strings.HasPrefix(input, "https://") {
 		return SourceRawURL
@@ -62,6 +69,8 @@ func Fetch(source string) (*FetchResult, error) {
 	switch DetectSource(source) {
 	case SourceGitHubTree:
 		return fetchGitHubTree(source)
+	case SourceGitHubBlob:
+		return fetchGitHubBlob(source)
 	case SourceRawURL:
 		return fetchRawURL(source)
 	case SourceLocalPath:
@@ -132,6 +141,45 @@ func githubFetchDir(owner, repo, ref, dirPath, prefix string, files map[string][
 		}
 	}
 	return nil
+}
+
+// fetchGitHubBlob handles GitHub blob URLs (single file view) like:
+// https://github.com/user/repo/blob/main/path/to/SKILL.md
+// Converts to raw.githubusercontent.com URL to get the actual content.
+func fetchGitHubBlob(url string) (*FetchResult, error) {
+	m := githubBlobRE.FindStringSubmatch(url)
+	if m == nil {
+		return nil, fmt.Errorf("invalid GitHub blob URL: %s", url)
+	}
+	owner, repo, ref, filePath := m[1], m[2], m[3], m[4]
+
+	rawURL := fmt.Sprintf("https://raw.githubusercontent.com/%s/%s/%s/%s", owner, repo, ref, filePath)
+	content, err := httpGet(rawURL)
+	if err != nil {
+		return nil, fmt.Errorf("downloading %s: %w", rawURL, err)
+	}
+
+	// Derive name from frontmatter or parent directory in the path.
+	name := ""
+	if fmName, _ := parseFrontmatter(content); fmName != "" {
+		name = fmName
+	}
+	if name == "" {
+		// Use parent directory: "skills/frontend-design/SKILL.md" → "frontend-design"
+		dir := filepath.Dir(filePath)
+		if dir != "." && dir != "/" {
+			name = filepath.Base(dir)
+		} else {
+			name = strings.TrimSuffix(filepath.Base(filePath), filepath.Ext(filePath))
+		}
+	}
+
+	// Use the original filename as the key (preserves SKILL.md vs custom names).
+	fileName := filepath.Base(filePath)
+	return &FetchResult{
+		Name:  name,
+		Files: map[string][]byte{fileName: content},
+	}, nil
 }
 
 // fetchRawURL handles direct URLs to a SKILL.md file.
