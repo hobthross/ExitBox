@@ -70,6 +70,9 @@ func TestCodexAgent(t *testing.T) {
 	if !strings.Contains(df, "sha256sum") {
 		t.Error("GetDockerfileInstall() should contain sha256sum verification")
 	}
+	if !strings.Contains(df, "apk add --no-cache bubblewrap") {
+		t.Error("GetDockerfileInstall() should install bubblewrap")
+	}
 
 	// GetFullDockerfile
 	full, err := c.GetFullDockerfile("v0.1.0")

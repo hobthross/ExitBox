@@ -124,7 +124,7 @@ When full git support is enabled and the network firewall is active, SSH traffic
 
 ### External Tools
 
-External tools are third-party CLI tools (GitHub CLI, etc.) that can be selected during setup. Their required packages are automatically installed at image build time.
+External tools are third-party CLI tools (Bun, GitHub CLI, etc.) that can be selected during setup. Their required packages are automatically installed at image build time.
 
 ```bash
 # Configure via the setup wizard:
@@ -702,6 +702,7 @@ Profiles are pre-configured development environments. The setup wizard suggests 
 | `devops`      | Docker CLI / kubectl / helm / opentofu / kind |
 | `web`         | Web server/testing tools                 |
 | `security`    | Security diagnostics tools               |
+| `ml`          | AI/ML tooling (huggingface-cli, safetensors) — requires `python` |
 | `flutter`     | Flutter SDK                              |
 
 ## Configuration

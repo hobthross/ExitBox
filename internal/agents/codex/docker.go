@@ -32,7 +32,8 @@ func (c *Codex) GetDockerfileInstall(buildCtx string) (string, error) {
 	}
 	binaryInside := strings.TrimSuffix(binaryName, ".tar.gz")
 
-	return fmt.Sprintf(`# Install Codex binary with SHA-256 verification
+	return fmt.Sprintf(`# Install Codex runtime dependencies and binary with SHA-256 verification
+RUN apk add --no-cache bubblewrap
 ARG CODEX_VERSION
 ARG CODEX_CHECKSUM
 COPY %s /tmp/codex.tar.gz

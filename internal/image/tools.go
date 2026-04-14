@@ -27,6 +27,7 @@ import (
 	"github.com/cloud-exit/exitbox/internal/config"
 	"github.com/cloud-exit/exitbox/internal/container"
 	"github.com/cloud-exit/exitbox/internal/ui"
+	"github.com/cloud-exit/exitbox/internal/wizard"
 )
 
 // ToolsHash computes a short hash of the global tool configuration
@@ -38,6 +39,7 @@ func ToolsHash(cfg *config.Config) string {
 	for _, b := range cfg.Tools.Binaries {
 		parts = append(parts, b.Name+"="+b.URLPattern)
 	}
+	parts = append(parts, cfg.ExternalTools...)
 	h := sha256.Sum256([]byte(strings.Join(parts, ",")))
 	return fmt.Sprintf("%x", h[:8])
 }
@@ -101,6 +103,14 @@ func BuildTools(ctx context.Context, rt container.Runtime, agentName string, for
 		url := strings.ReplaceAll(b.URLPattern, "{arch}", "${ARCH}")
 		df.WriteString(fmt.Sprintf("    curl -sL \"%s\" -o /usr/local/bin/%s && \\\n", url, b.Name))
 		df.WriteString(fmt.Sprintf("    chmod +x /usr/local/bin/%s\n\n", b.Name))
+	}
+
+	for _, step := range wizard.ComputeExternalToolInstallSteps(cfg.ExternalTools) {
+		df.WriteString(step)
+		if !strings.HasSuffix(step, "\n") {
+			df.WriteString("\n")
+		}
+		df.WriteString("\n")
 	}
 
 	// Stay as root — project layer handles USER switch
