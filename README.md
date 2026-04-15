@@ -19,7 +19,6 @@
 
 Run AI coding assistants (Claude, Codex, OpenCode) in isolated containers with defense-in-depth security.
 
-
 ## Getting Started
 
 ```bash
