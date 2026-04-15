@@ -59,6 +59,7 @@ ExitBox automatically:
 - **Named Resumable Sessions** — save and resume agent conversations by name across container restarts
 - **Multi-Agent Support** — run Claude Code, OpenAI Codex, or OpenCode in the same isolated environment
 - **Workspace Isolation** — named contexts (personal, work, client) with separate credentials, tools, and vault per workspace
+- **Codex Account Switching** — save and switch between multiple Codex logins inside a workspace with `exitbox codex accounts`
 - **IDE Integration** — Unix socket relay connects host editors (VS Code, Cursor, Windsurf) to agents inside the container for go-to-definition, diagnostics, and code actions
 - **Full Git Support** — optional mode that mounts host `.gitconfig` and SSH agent for seamless git operations inside the container
 - **GitHub CLI Authentication** — pre-flight vault import for `GITHUB_TOKEN` with automatic in-container export so `gh` and HTTPS git work transparently
@@ -123,7 +124,7 @@ When full git support is enabled and the network firewall is active, SSH traffic
 
 ### External Tools
 
-External tools are third-party CLI tools (GitHub CLI, etc.) that can be selected during setup. Their required packages are automatically installed at image build time.
+External tools are third-party CLI tools (Bun, GitHub CLI, etc.) that can be selected during setup. Their required packages are automatically installed at image build time.
 
 ```bash
 # Configure via the setup wizard:
@@ -166,6 +167,44 @@ exitbox run opencode -- auth logout   # remove stored credentials
 ```
 
 When the firewall is active, Google OAuth domains (`google.com`, `googleapis.com`) are included in the default allowlist. If you use a provider with a different OAuth domain, add it via `exitbox-allow <domain>` or the `-a` flag.
+
+### Codex Account Switching
+
+Codex CLI stores its login state in `.codex`, but ExitBox can keep multiple named Codex accounts per workspace and swap the active one without touching the rest of the workspace.
+
+```bash
+# Save the current login under a name
+exitbox codex accounts save personal
+
+# Create an empty slot for another login
+exitbox codex accounts add work
+
+# Log into that slot from your host shell
+# Do not type /login inside the Codex prompt
+exitbox run codex --workspace default -- login
+exitbox codex accounts save work
+
+# Switch back later
+exitbox codex accounts switch personal
+exitbox codex accounts list
+exitbox codex accounts current
+```
+
+How it works:
+
+- The active account for a workspace stays in that workspace's normal Codex config directory.
+- Saved accounts are stored as named sidecar copies under the same workspace profile.
+- `save <name>` snapshots the currently active Codex login.
+- `add <name>` creates a new empty active slot and clears the current Codex login so you can run `codex login`.
+- `switch <name>` saves the current active login back to its named slot, then restores the requested one.
+- `list` shows saved accounts and whether one is current, previous, or still pending login.
+- `current` shows the current and previous account names recorded for that workspace.
+
+Notes:
+
+- Account switching is workspace-local. `personal` in workspace `work` is separate from `personal` in workspace `default`.
+- Use `--workspace <name>` with any of these commands to manage accounts for a non-active workspace.
+- If the current Codex login has never been named, `add` or `switch` will ask you to save it first with `exitbox codex accounts save <name>`.
 
 ### RTK Token Optimizer (Experimental)
 
@@ -418,6 +457,11 @@ exitbox update            # Update ExitBox to the latest version
 exitbox aliases           # Print shell aliases for ~/.bashrc
 exitbox agents list       # List enabled agents and their status
 exitbox agents config <agent>  # Open agent config in $EDITOR
+exitbox codex accounts list     # List saved Codex accounts
+exitbox codex accounts current  # Show current/previous Codex account
+exitbox codex accounts save <name>   # Save active Codex login
+exitbox codex accounts add <name>    # Create a new empty Codex login slot
+exitbox codex accounts switch <name> # Activate a saved Codex login
 exitbox config import <agent|all>  # Import agent config from host
 exitbox config edit <agent>        # Open agent config file in $EDITOR
 exitbox skills install <source>    # Install a skill from URL/path
@@ -658,6 +702,7 @@ Profiles are pre-configured development environments. The setup wizard suggests 
 | `devops`      | Docker CLI / kubectl / helm / opentofu / kind |
 | `web`         | Web server/testing tools                 |
 | `security`    | Security diagnostics tools               |
+| `ml`          | AI/ML tooling (huggingface-cli, safetensors) — requires `python` |
 | `flutter`     | Flutter SDK                              |
 
 ## Configuration

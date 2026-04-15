@@ -183,6 +183,19 @@ func TestToolsHash_IncludesBinaries(t *testing.T) {
 	}
 }
 
+func TestToolsHash_IncludesExternalTools(t *testing.T) {
+	cfg1 := &config.Config{}
+	cfg2 := &config.Config{
+		ExternalTools: []string{"Bun"},
+	}
+
+	h1 := ToolsHash(cfg1)
+	h2 := ToolsHash(cfg2)
+	if h1 == h2 {
+		t.Error("ToolsHash should differ when external tools are added")
+	}
+}
+
 func TestWorkspaceHash_Deterministic(t *testing.T) {
 	cfg := config.DefaultConfig()
 	dir := t.TempDir()

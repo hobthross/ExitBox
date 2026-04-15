@@ -122,7 +122,13 @@ RUN set -e && \
 		return `RUN npm install -g typescript eslint prettier yarn pnpm
 `
 	case "ml":
-		return "# ML profile uses build-tools for compilation\n"
+		// Install AI/ML Python tooling into the venv created by the python profile.
+		// huggingface_hub[cli] provides the `huggingface-cli` command.
+		return `# ML profile - AI/ML tooling (huggingface-cli, etc.) into python venv
+RUN /home/user/.venv/bin/pip install --no-cache-dir \
+    "huggingface_hub[cli]" \
+    safetensors
+`
 	}
 	return ""
 }

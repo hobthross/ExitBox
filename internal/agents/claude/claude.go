@@ -85,6 +85,9 @@ func (c *Claude) EnsureWorkspaceAgentConfig(workspaceName string) error {
 
 	cfgDir := fsutil.EnsureDir(root, ".config")
 	fsutil.SeedDirOnce(filepath.Join(home, ".config"), cfgDir)
+
+	// Persist ~/.cache so MCP OAuth tokens survive across sessions.
+	_ = fsutil.EnsureDir(root, ".cache")
 	return nil
 }
 

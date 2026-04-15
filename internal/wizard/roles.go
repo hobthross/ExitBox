@@ -124,6 +124,13 @@ var Roles = []Role{
 		Languages:      []string{"Python", "Go"},
 		ToolCategories: []string{"Networking", "Security", "Shell Utils"},
 	},
+	{
+		Name:           "AI Developer",
+		Description:    "AI/ML development (huggingface-cli, model tooling)",
+		Profiles:       []string{"python", "ml", "build-tools"},
+		Languages:      []string{"Python"},
+		ToolCategories: []string{"Build Tools"},
+	},
 }
 
 // AllLanguages defines the available language choices.
@@ -166,11 +173,18 @@ type ExternalTool struct {
 	Name        string
 	Description string
 	Packages    []string             // Alpine APK packages
+	InstallStep string               // Additional Dockerfile RUN instruction
 	Configs     []ExternalToolConfig // Host configs to detect (for UI hints)
 }
 
 // AllExternalTools defines the available external tools.
 var AllExternalTools = []ExternalTool{
+	{
+		Name:        "Bun",
+		Description: "bun — JavaScript runtime and package manager",
+		Packages:    []string{"nodejs", "npm"},
+		InstallStep: "RUN npm install -g bun\n",
+	},
 	{
 		Name:        "GitHub CLI",
 		Description: "gh — GitHub from the command line",
@@ -296,6 +310,27 @@ func ComputeExternalToolPackages(names []string) []string {
 						seen[pkg] = true
 						result = append(result, pkg)
 					}
+				}
+				break
+			}
+		}
+	}
+
+	return result
+}
+
+// ComputeExternalToolInstallSteps returns additional Dockerfile snippets
+// required by selected external tools.
+func ComputeExternalToolInstallSteps(names []string) []string {
+	seen := make(map[string]bool)
+	var result []string
+
+	for _, name := range names {
+		for _, et := range AllExternalTools {
+			if et.Name == name {
+				if et.InstallStep != "" && !seen[et.InstallStep] {
+					seen[et.InstallStep] = true
+					result = append(result, et.InstallStep)
 				}
 				break
 			}

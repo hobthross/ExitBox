@@ -87,6 +87,15 @@ set -g pane-border-style "fg=colour236"
 set -g pane-active-border-style "fg=colour236"
 set -g message-style "bg=colour236,fg=colour255"
 set -g allow-passthrough on
+set -g set-clipboard on
+# Word separators: exclude URL characters so double-click selects entire URLs.
+set -g word-separators " '\"<>{}()|"
+# Disable right-click context menu so the terminal's native menu works
+# (copy, paste, open URL, etc.).
+unbind -n MouseDown3Pane
+unbind -n MouseDown3StatusLeft
+unbind -n MouseDown3StatusRight
+unbind -n MouseDown3Status
 TMUXEOF
 
     if [[ "${EXITBOX_STATUS_BAR:-true}" != "true" ]]; then
@@ -308,11 +317,15 @@ apply_active_workspace_links() {
 
     case "$AGENT" in
         claude)
-            mkdir -p "$workspace_root/.claude" "$workspace_root/.config"
+            mkdir -p "$workspace_root/.claude" "$workspace_root/.config" \
+                     "$workspace_root/.cache"
             touch "$workspace_root/.claude.json"
             link_path "$workspace_root/.claude" "$HOME/.claude"
             link_path "$workspace_root/.claude.json" "$HOME/.claude.json"
             link_path "$workspace_root/.config" "$HOME/.config"
+            # Persist ~/.cache so MCP OAuth tokens (stored in
+            # ~/.cache/claude-cli-nodejs/) survive across sessions.
+            link_path "$workspace_root/.cache" "$HOME/.cache"
             ;;
         codex)
             mkdir -p "$workspace_root/.codex" "$workspace_root/.config/codex"
@@ -334,6 +347,74 @@ apply_active_workspace_links() {
             link_path "$workspace_root/.cache/opencode" "$HOME/.cache/opencode"
             ;;
     esac
+
+    # Share gh CLI auth across agents. Claude's workspace has the full
+    # ~/.config/ (including ~/.config/gh/) but Codex/OpenCode only mount
+    # their own subdirs. Link gh config from Claude's workspace if present.
+    if [[ "$AGENT" != "claude" ]] && [[ ! -d "$HOME/.config/gh" ]]; then
+        local claude_gh="${GLOBAL_WORKSPACE_ROOT}/${name}/claude/.config/gh"
+        if [[ -d "$claude_gh" ]]; then
+            mkdir -p "$HOME/.config"
+            link_path "$claude_gh" "$HOME/.config/gh"
+        fi
+    fi
+}
+
+codex_session_storage_name() {
+    local name
+    name="$(current_session_name)"
+    if [[ -z "$name" && "${EXITBOX_AUTO_RESUME:-false}" == "true" ]]; then
+        name="$(get_active_session_name)"
+    fi
+    if [[ -z "$name" ]]; then
+        name="$(default_session_name)"
+    fi
+    echo "$name"
+}
+
+codex_uses_direct_home() {
+    [[ "$AGENT" != "codex" ]] && return 1
+    case "${1:-}" in
+        login|logout|auth)
+            return 0
+            ;;
+    esac
+    return 1
+}
+
+configure_codex_session_storage() {
+    [[ "$AGENT" != "codex" ]] && return 0
+    codex_uses_direct_home "$@" && return 0
+    [[ -e "$HOME/.codex" ]] || return 0
+
+    local shared_root session_name session_key overlay_root state_root item base
+    shared_root="$(readlink -f "$HOME/.codex" 2>/dev/null || printf '%s' "$HOME/.codex")"
+    [[ -d "$shared_root" ]] || return 0
+
+    session_name="$(codex_session_storage_name)"
+    [[ -n "$session_name" ]] || return 0
+    export EXITBOX_SESSION_NAME="$session_name"
+
+    session_key="$(session_key_for_name "$session_name")"
+    overlay_root="${shared_root}/.exitbox/session-home/${session_key}"
+    state_root="${shared_root}/.exitbox/session-data/${session_key}"
+    mkdir -p "$overlay_root" "${state_root}/sessions"
+
+    shopt -s nullglob
+    for item in "$shared_root"/* "$shared_root"/.[!.]* "$shared_root"/..?*; do
+        [[ -e "$item" ]] || continue
+        base="$(basename "$item")"
+        case "$base" in
+            .|..|sessions|.exitbox)
+                continue
+                ;;
+        esac
+        ln -sfn "$item" "${overlay_root}/${base}"
+    done
+    shopt -u nullglob
+
+    link_path "${state_root}/sessions" "${overlay_root}/sessions"
+    link_path "$overlay_root" "$HOME/.codex"
 }
 
 link_skills() {
@@ -663,6 +744,8 @@ capture_resume_token() {
 }
 
 build_resume_args() {
+    codex_uses_direct_home "$@" && return
+
     # Session resume resolution (called from run_agent_loop):
     #
     # Priority order:
@@ -791,6 +874,7 @@ run_agent_once() {
 
 run_agent_loop() {
     apply_active_workspace_links
+    configure_codex_session_storage "$@"
     update_tmux_status
     if [[ -n "$AGENT" ]]; then
         inject_sandbox_instructions
@@ -798,7 +882,7 @@ run_agent_loop() {
         link_skills
     fi
 
-    build_resume_args
+    build_resume_args "$@"
 
     # Check if user already passed resume-related flags in their args
     local user_has_resume=false
@@ -1046,6 +1130,15 @@ You are running inside an ExitBox sandboxed container. Important constraints:
   user. NEVER show raw secret values in your responses, tool outputs, or summaries.
   Examples: \`Authorization: Bearer <redacted>\`, \`password: <redacted>\`,
   \`API_KEY=<redacted>\`. This applies to ALL contexts — code output, logs, configs, etc.
+- MCP SERVERS: MCP servers CAN work inside this sandbox. Do NOT tell the user that
+  MCP servers are unavailable or that the sandbox prevents them from working.
+  If an MCP server fails to connect, the most likely cause is that its API domain
+  is not in the firewall allowlist. Use \`exitbox-allow <domain>\` to request access
+  for the provider's root domain (e.g. \`exitbox-allow atlassian.net\` for Atlassian,
+  \`exitbox-allow linear.app\` for Linear, \`exitbox-allow slack.com\` for Slack).
+  MCP auth tokens are stored in the agent config directory which is mounted into
+  the container. If auth fails, the user may need to re-authenticate — do not assume
+  it is impossible. Guide the user through the auth flow instead of giving up.
 - Focus on writing, testing, and debugging code within /workspace. That is your scope.
 <!-- END-EXITBOX-SANDBOX -->
 "
@@ -1518,6 +1611,7 @@ fi
 
 if [[ -n "$AGENT" ]]; then
     apply_active_workspace_links
+    configure_codex_session_storage "$@"
     inject_sandbox_instructions
     inject_codex_approval_rules
     link_skills

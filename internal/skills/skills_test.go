@@ -102,6 +102,8 @@ func TestDetectSource(t *testing.T) {
 	}{
 		{"https://github.com/anthropics/skills/tree/main/skills/frontend-design", SourceGitHubTree},
 		{"http://github.com/user/repo/tree/dev/path/to/skill", SourceGitHubTree},
+		{"https://github.com/user/repo/blob/main/skills/my-skill/SKILL.md", SourceGitHubBlob},
+		{"https://github.com/rohitg00/awesome/blob/main/agents/infra/k8s.md", SourceGitHubBlob},
 		{"https://example.com/SKILL.md", SourceRawURL},
 		{"https://raw.githubusercontent.com/user/repo/main/SKILL.md", SourceRawURL},
 		{"/home/user/skills/my-skill", SourceLocalPath},
